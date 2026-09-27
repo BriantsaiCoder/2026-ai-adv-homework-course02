@@ -31,7 +31,7 @@ export default defineConfig({
     globals: true,          // describe/it/expect 為全域變數，無需 import
     fileParallelism: false, // 停用檔案平行執行（循序執行）
     sequence: {
-      files: [              // 指定執行順序
+      files: [              // Vitest 2 不讀取此鍵，實際無作用
         'tests/auth.test.js',
         'tests/products.test.js',
         'tests/cart.test.js',
@@ -60,21 +60,9 @@ export default defineConfig({
 
 ## 執行順序
 
-```
-auth.test.js          ← 第 1 順位：建立使用者，驗證認證機制
-    ↓
-products.test.js      ← 第 2 順位：驗證種子商品（依賴 DB 初始化）
-    ↓
-cart.test.js          ← 第 3 順位：需要商品 + 認證 token
-    ↓
-orders.test.js        ← 第 4 順位：於 beforeAll 自建購物車後下單
-    ↓
-adminProducts.test.js ← 第 5 順位：需要 admin token
-    ↓
-adminOrders.test.js   ← 第 6 順位：於 beforeAll 自建訂單 + admin token
-```
+Vitest 2 不讀取 `sequence.files`；實際檔案順序由預設 sequencer 依上次執行耗時與檔案大小決定，每次可能不同。各檔 DB 獨立，順序不影響結果。
 
-**為何要循序執行**：`fileParallelism: false` 確保測試檔案依序執行。由於 `DB_PATH=:memory:` 且 Vitest 預設 forks pool 每個測試檔各跑一個 process，各檔拿到獨立、剛建表並植入種子資料的 DB，檔案之間不共享資料；各檔所需的購物車、訂單等前置資料皆於自身 `beforeAll` 建立。
+**為何要循序執行**：`fileParallelism: false` 使測試檔案逐一執行。由於 `DB_PATH=:memory:` 且 Vitest 預設 forks pool 每個測試檔各跑一個 process，各檔拿到獨立、剛建表並植入種子資料的 DB，檔案之間不共享資料；各檔所需的購物車、訂單等前置資料皆於自身 `beforeAll` 建立。
 
 ## 輔助函式說明
 
@@ -155,23 +143,9 @@ describe('Your Feature', () => {
 });
 ```
 
-### 2. 註冊測試執行順序
+### 2. 無需登錄執行順序
 
-在 `vitest.config.js` 的 `sequence.files` 陣列中加入新檔案路徑（僅決定執行順序；各檔 DB 獨立，勿依賴其他檔案的資料）：
-
-```javascript
-sequence: {
-  files: [
-    'tests/auth.test.js',
-    'tests/products.test.js',
-    'tests/cart.test.js',
-    'tests/orders.test.js',
-    'tests/adminProducts.test.js',
-    'tests/adminOrders.test.js',
-    'tests/yourFeature.test.js',  // ← 新增
-  ],
-},
-```
+Vitest 依預設 include 自動收集 `*.test.js`，新檔案不需加入 `sequence.files`（Vitest 2 不讀取該鍵）。各檔 DB 獨立，前置資料在同檔 `beforeAll` 建立，勿依賴其他檔案的資料。
 
 ### 3. 測試模式
 
@@ -221,7 +195,7 @@ it('should work with session ID', async () => {
 
 ## 常見陷阱
 
-### 1. 測試順序依賴
+### 1. 跨檔資料依賴
 
 各測試檔的 DB 彼此獨立，無法依賴其他檔案建立的資料。新測試需要的使用者、購物車、訂單等前置資料，應在同檔的 `beforeAll` 自行建立。
 
@@ -241,9 +215,9 @@ it('should work with session ID', async () => {
 
 `hookTimeout: 10000`（10 秒）。若 `beforeAll` 中需要多次 HTTP 請求（如註冊 + 登入 + 加入購物車），應注意是否超時。
 
-### 5. 無 afterAll 清理
+### 5. 資料清理非必要
 
-測試未實作資料清理，也不需要：in-memory DB 隨測試 process 結束而消失，每次執行都從種子資料重新開始，不會累積到開發用的 `database.sqlite`（先前共用該檔時，重複執行會耗盡種子商品庫存而連鎖失敗）。
+除 `orders.test.js` 運費測試的 `afterAll` 外，測試未實作資料清理，也不需要：in-memory DB 隨測試 process 結束而消失，每次執行都從種子資料重新開始，不會累積到開發用的 `database.sqlite`（先前共用該檔時，重複執行會耗盡種子商品庫存而連鎖失敗）。
 
 ### 6. supertest 直接使用 app
 
