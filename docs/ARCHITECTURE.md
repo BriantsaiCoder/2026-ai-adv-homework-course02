@@ -361,7 +361,7 @@ server.js
 ├─ 2. 取得用戶購物車所有品項（JOIN products 取得即時價格與庫存）
 ├─ 3. 檢查購物車是否為空 → 400 CART_EMPTY
 ├─ 4. 檢查每個品項庫存是否充足 → 400 STOCK_INSUFFICIENT（列出所有不足商品名稱）
-├─ 5. 計算 totalAmount = Σ(price × quantity)
+├─ 5. 計算 totalAmount = 小計 Σ(price × quantity) + 運費（小計未滿 500 加 150，滿額免運）
 ├─ 6. 生成 orderNo: ORD-YYYYMMDD-{5碼UUID}
 │
 └─ 7. 🔒 Transaction 開始
@@ -382,7 +382,9 @@ server.js
 ```
 用戶結帳 → POST /api/orders（建立訂單，含 merchant_trade_no）
   │
-  ├─ 前端導向 GET /ecpay/payment/:orderId
+  ├─ 前端導向 /orders/:orderId（訂單確認頁），使用者點「前往綠界付款」
+  │
+  ├─ GET /ecpay/payment/:orderId
   │    └─ Server 產生 ECPay AIO 參數（MerchantTradeNo, TotalAmount, ItemName 等）
   │    └─ 計算 CheckMacValue（SHA256，ECPay 專用 URL 編碼）
   │    └─ 回傳自動送出 HTML 表單 → 瀏覽器 POST 至綠界

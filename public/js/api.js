@@ -23,6 +23,12 @@ async function apiFetch(url, options = {}) {
   return data;
 }
 
+// Mirrors the server rule in src/routes/orderRoutes.js (order total_amount includes shipping).
+const FREE_SHIPPING_THRESHOLD = 500;
+function shippingFee(subtotal) {
+  return subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : 150;
+}
+
 // Seed images are Unsplash URLs sized w=400; request a width that fits the slot.
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1490750967868-88aa4f44baee?w=400';
 function sizedImage(url, width) {

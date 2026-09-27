@@ -136,6 +136,9 @@
                 </tr>
               </tbody>
             </table>
+            <div v-if="shippingOf(detailOrder) > 0" class="flex justify-end mt-3 text-text-secondary">
+              <span>運費 NT$ {{ shippingOf(detailOrder).toLocaleString() }}</span>
+            </div>
             <div class="flex justify-end mt-3 pt-2 border-t border-gray-100">
               <span class="font-bold text-rose-primary text-lg">總計 NT$ {{ detailOrder.total_amount.toLocaleString() }}</span>
             </div>

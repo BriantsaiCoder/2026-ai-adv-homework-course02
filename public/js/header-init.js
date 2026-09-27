@@ -29,9 +29,13 @@ document.addEventListener('DOMContentLoaded', function () {
       : '<a href="/login" class="' + item + '">登入／註冊</a>';
   }
 
-  document.querySelectorAll('[data-orders-link]').forEach(function (el) {
-    el.style.display = loggedIn ? '' : 'none';
-  });
+  // Same-page links (e.g. /#products on the home page) don't reload, so close the menu explicitly.
+  const mobileNav = document.getElementById('mobile-nav');
+  if (mobileNav) {
+    mobileNav.addEventListener('click', function (e) {
+      if (e.target.closest('nav a, nav button')) mobileNav.open = false;
+    });
+  }
 
   refreshCartBadge();
 });

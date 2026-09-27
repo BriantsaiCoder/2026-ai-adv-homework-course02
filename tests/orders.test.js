@@ -29,7 +29,7 @@ describe('Orders API - shipping fee', () => {
     const res = await request(app)
       .post('/api/admin/products')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: '運費測試商品', price: 300, stock: 10 });
+      .send({ name: '運費測試商品', price: 250, stock: 10 });
     cheapProductId = res.body.data.id;
   });
 
@@ -50,15 +50,15 @@ describe('Orders API - shipping fee', () => {
 
     expect(res.status).toBe(201);
     orderIds.push(res.body.data.id);
-    expect(res.body.data.total_amount).toBe(300 + 150);
+    expect(res.body.data.total_amount).toBe(250 + 150);
   });
 
-  it('should waive shipping when subtotal reaches NT$ 500', async () => {
+  it('should waive shipping when subtotal is exactly NT$ 500', async () => {
     const res = await orderWith(userToken, cheapProductId, 2);
 
     expect(res.status).toBe(201);
     orderIds.push(res.body.data.id);
-    expect(res.body.data.total_amount).toBe(600);
+    expect(res.body.data.total_amount).toBe(500);
   });
 });
 

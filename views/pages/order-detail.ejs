@@ -38,15 +38,15 @@
     <div v-if="view === 'failed'" role="alert" class="-mt-1 flex items-center gap-3.5 rounded-md bg-error-bg px-4 py-4 lg:-mt-2 lg:px-[22px]">
       <span class="text-error"><%- include('../partials/icon', { name: 'circle-alert' }) %></span>
       <div>
-        <p class="text-[15px] font-medium text-error">{{ order.status === 'failed' ? '付款失敗' : '付款失敗，請重試' }}</p>
-        <p class="mt-1 text-sm text-ink-2">{{ order.status === 'failed' ? '這筆訂單已標記為付款失敗，請重新選購下單。' : '若你已在綠界完成付款，請點「查詢付款狀態」重新確認。' }}</p>
+        <p class="text-[15px] font-medium text-error">{{ order.status === 'failed' ? '付款失敗' : '尚未收到付款' }}</p>
+        <p class="mt-1 text-sm text-ink-2">{{ order.status === 'failed' ? '這筆訂單已標記為付款失敗，請重新選購下單。' : '若選擇 ATM 或超商代碼，完成繳費後請點「查詢付款狀態」；若付款未成功，可重新前往綠界付款。' }}</p>
       </div>
     </div>
 
     <div class="flex flex-col gap-2.5 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <h1 class="font-serif text-[28px] font-semibold text-stem lg:text-[40px]">{{ view === 'failed' ? '付款未完成' : '確認訂單，前往付款' }}</h1>
-        <p class="mt-2.5 text-sm leading-[1.7] text-ink-2 lg:mt-3 lg:text-base">{{ view === 'failed' ? '綠界回報這筆付款未成功或已取消。訂單仍為你保留，可重新前往付款。' : '訂單已建立。請確認內容無誤，再前往綠界完成付款。' }}</p>
+        <p class="mt-2.5 text-sm leading-[1.7] text-ink-2 lg:mt-3 lg:text-base">{{ view === 'failed' ? '目前尚未收到這筆訂單的付款。訂單仍為你保留，可重新前往付款。' : '訂單已建立。請確認內容無誤，再前往綠界完成付款。' }}</p>
       </div>
       <div class="flex items-center justify-between pt-2 lg:gap-7 lg:pt-0">
         <div class="lg:flex lg:flex-col lg:gap-1"><span class="hidden text-[13px] text-ink-3 lg:block">訂單編號</span><span class="font-num text-sm text-ink-2 lg:text-base lg:text-ink">{{ order.order_no }}</span></div>

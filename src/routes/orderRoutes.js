@@ -58,6 +58,7 @@ function generateOrderNo() {
  *                       type: string
  *                     total_amount:
  *                       type: integer
+ *                       description: 小計 + 運費（小計未滿 500 加收 150）
  *                     status:
  *                       type: string
  *                     items:
@@ -213,6 +214,7 @@ router.post('/', (req, res) => {
  *                             type: string
  *                           total_amount:
  *                             type: integer
+ *                             description: 小計 + 運費（小計未滿 500 加收 150）
  *                           status:
  *                             type: string
  *                           created_at:
@@ -272,6 +274,7 @@ router.get('/', (req, res) => {
  *                       type: string
  *                     total_amount:
  *                       type: integer
+ *                       description: 小計 + 運費（小計未滿 500 加收 150）
  *                     status:
  *                       type: string
  *                     created_at:
@@ -357,6 +360,7 @@ router.get('/:id', (req, res) => {
  *                       type: string
  *                     total_amount:
  *                       type: integer
+ *                       description: 小計 + 運費（小計未滿 500 加收 150）
  *                     status:
  *                       type: string
  *                     created_at:

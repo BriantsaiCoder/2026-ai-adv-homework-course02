@@ -7,14 +7,13 @@ createApp({
     const confirmVisible = ref(false);
     const deleteItemId = ref('');
 
-    const FREE_SHIPPING_THRESHOLD = 500;
     const total = computed(function () {
       return items.value.reduce(function (sum, item) {
         return sum + item.product.price * item.quantity;
       }, 0);
     });
-    const freeShipping = computed(function () { return total.value >= FREE_SHIPPING_THRESHOLD; });
-    const shipping = computed(function () { return freeShipping.value ? 0 : 150; });
+    const shipping = computed(function () { return shippingFee(total.value); });
+    const freeShipping = computed(function () { return shipping.value === 0; });
 
     async function loadCart() {
       loading.value = true;

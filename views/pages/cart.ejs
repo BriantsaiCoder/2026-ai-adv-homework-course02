@@ -75,8 +75,7 @@
       <a href="/#products" class="inline-flex items-center gap-2 text-sm text-rose lg:hidden"><%- include('../partials/icon', { name: 'arrow-left', cls: 'w-4 h-4' }) %>繼續選購</a>
     </div>
 
-    <div class="h-[88px] lg:hidden"></div>
-    <div class="fixed inset-x-0 bottom-0 z-40 flex items-center gap-3.5 border-t border-line bg-white px-5 pb-6 pt-3 shadow-[0_-4px_16px_rgba(34,56,46,0.08)] lg:hidden">
+    <div data-sticky-bar class="fixed inset-x-0 bottom-0 z-40 flex items-center gap-3.5 border-t border-line bg-white px-5 pb-6 pt-3 shadow-[0_-4px_16px_rgba(34,56,46,0.08)] lg:hidden">
       <div>
         <p class="text-xs text-ink-3">總計</p>
         <p class="font-num text-xl">NT$ {{ (total + shipping).toLocaleString() }}</p>

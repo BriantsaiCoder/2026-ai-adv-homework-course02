@@ -10,7 +10,7 @@
         </summary>
         <nav class="absolute left-0 top-full mt-3 w-60 bg-white border border-line rounded-md shadow-lg p-2 flex flex-col text-[15px] text-ink">
           <a href="/#products" class="px-3 py-2.5 rounded hover:bg-tissue">所有花禮</a>
-          <a href="/orders" data-orders-link class="px-3 py-2.5 rounded hover:bg-tissue" style="display: none;">我的訂單</a>
+          <a href="/orders" class="px-3 py-2.5 rounded hover:bg-tissue">我的訂單</a>
           <a href="/cart" class="px-3 py-2.5 rounded hover:bg-tissue">購物車</a>
           <div id="auth-nav-mobile" class="border-t border-line mt-1 pt-1 flex flex-col"></div>
         </nav>
@@ -21,9 +21,10 @@
         <span class="hidden lg:inline font-num italic text-sm text-ink-3 pb-0.5">Flower Life</span>
       </a>
 
+      <% const ordersActive = typeof pageScript !== 'undefined' && ['orders', 'order-detail'].includes(pageScript); %>
       <nav class="hidden lg:flex items-center gap-10 text-[15px]">
-        <a href="/#products" class="text-ink hover:text-rose transition-colors">所有花禮</a>
-        <a href="/orders" data-orders-link class="text-ink-2 hover:text-rose transition-colors" style="display: none;">我的訂單</a>
+        <a href="/#products" class="<%= ordersActive ? 'text-ink-2' : 'text-ink' %> hover:text-rose transition-colors">所有花禮</a>
+        <a href="/orders" class="<%= ordersActive ? 'text-ink font-medium' : 'text-ink-2' %> hover:text-rose transition-colors" <%- ordersActive ? 'aria-current="page"' : '' %>>我的訂單</a>
       </nav>
 
       <div class="flex items-center gap-7">

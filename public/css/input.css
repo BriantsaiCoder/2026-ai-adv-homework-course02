@@ -50,6 +50,13 @@
   summary::-webkit-details-marker {
     display: none;
   }
+
+  /* Reserve room under the footer for the mobile fixed buy/checkout bar. */
+  @media (width < 64rem) {
+    body:has([data-sticky-bar]) {
+      padding-bottom: 88px;
+    }
+  }
 }
 
 @layer components {

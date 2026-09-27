@@ -16,7 +16,7 @@ createApp({
         return sum + item.product.price * item.quantity;
       }, 0);
     });
-    const shipping = computed(function () { return cartTotal.value >= 500 ? 0 : 150; });
+    const shipping = computed(function () { return shippingFee(cartTotal.value); });
 
     function validate() {
       errors.value = {};
