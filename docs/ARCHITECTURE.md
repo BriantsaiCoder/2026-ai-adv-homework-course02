@@ -401,7 +401,7 @@ server.js
   └─ 付款驗證
        └─ POST /api/orders/:id/check-payment
             ├─ 呼叫綠界 QueryTradeInfo API（TimeStamp 每次重新產生）
-            ├─ 驗證回應 CheckMacValue＋已付款時 MerchantTradeNo 相符（失敗 → throw → 500 ECPAY_QUERY_ERROR）
+            ├─ 驗證回應 CheckMacValue＋MerchantTradeNo 與查詢編號相符（失敗 → throw → 500 ECPAY_QUERY_ERROR）
             ├─ TradeStatus === '1' → 更新訂單狀態為 paid
             └─ 其他 → 回傳「尚未完成付款」
 ```

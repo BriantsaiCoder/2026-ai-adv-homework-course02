@@ -96,6 +96,11 @@ createApp({
       }
     }
 
+    // 從綠界按上一頁時頁面可能由 bfcache 還原，redirecting 仍為 true，需重設才能再次付款
+    window.addEventListener('pageshow', function (event) {
+      if (event.persisted) redirecting.value = false;
+    });
+
     onMounted(async function () {
       try {
         const res = await apiFetch('/api/orders/' + orderId);
