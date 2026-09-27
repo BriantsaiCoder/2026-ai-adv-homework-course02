@@ -2,7 +2,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database');
 const authMiddleware = require('../middleware/authMiddleware');
-const { queryTradeInfo, buildAioFormParams } = require('../utils/ecpay');
+const { nextTradeNo, queryIssuedTrades, buildAioFormParams } = require('../utils/ecpay');
 
 const router = express.Router();
 
@@ -443,13 +443,13 @@ router.patch('/:id/pay', (req, res) => {
  *       200:
  *         description: 回傳 AIO 表單 action 與 fields，由前端送出至綠界
  *       400:
- *         description: 訂單狀態不是 pending，或付款嘗試次數已達上限
+ *         description: 訂單狀態不是 pending，或付款嘗試次數已達上限（99 次）
  *       404:
  *         description: 訂單不存在
  *       409:
- *         description: 綠界回報目前編號已付款（訂單已標記 paid），或查詢期間訂單已被換號／付款
+ *         description: 綠界回報任一曾發出的編號已付款（訂單已標記 paid），或查詢期間訂單已被換號／付款
  *       503:
- *         description: 無法確認目前編號未付款（查詢失敗、逾時、驗證失敗或非預期的 TradeStatus）
+ *         description: 無法確認每個曾發出的編號皆未付款（查詢失敗、逾時、驗證失敗或非預期的 TradeStatus）
  */
 // 綠界拒收重複的 MerchantTradeNo（10300028），每次付款嘗試改用 order_no 去連字號 + 遞增序號
 router.post('/:id/payment-attempt', async (req, res, next) => {
@@ -462,26 +462,25 @@ router.post('/:id/payment-attempt', async (req, res, next) => {
       return res.status(400).json({ data: null, error: 'INVALID_STATUS', message: '訂單狀態不是 pending，無法付款' });
     }
 
-    const baseTradeNo = order.order_no.replace(/-/g, '');
-    const prevTradeNo = order.merchant_trade_no || baseTradeNo;
-
-    // 換號前確認目前編號未付款，避免依序重試時對已付款訂單重複扣款（從未送出的編號回 10200047，照常換號）
-    const result = await queryTradeInfo(prevTradeNo).catch((err) => {
+    // 換號前確認曾發出的編號皆未付款，避免對已付款訂單重複扣款（從未送出的編號回 10200047，照常換號）
+    const results = await queryIssuedTrades(order).catch((err) => {
       console.error('[ECPay] QueryTradeInfo error:', err.message);
       return null;
     });
-    if (result && result.TradeStatus === '1') {
-      db.prepare('UPDATE orders SET status = ? WHERE id = ?').run('paid', order.id);
+    const paid = results && results.find((r) => r.TradeStatus === '1');
+    if (paid) {
+      db.prepare('UPDATE orders SET status = ?, merchant_trade_no = ? WHERE id = ?').run('paid', paid.MerchantTradeNo, order.id);
       return res.status(409).json({ data: null, error: 'ORDER_PAID', message: '此訂單已付款' });
     }
-    // 只有確認未付款（0）、交易失敗（10200095）或從未送出（10200047）才換號；查詢失敗、缺 TradeStatus 或其他代碼一律不換號
-    if (!result || !['0', '10200047', '10200095'].includes(result.TradeStatus)) {
-      if (result) console.error('[ECPay] Unexpected TradeStatus:', result.TradeStatus, prevTradeNo);
+    // 只有皆確認未付款（0）、交易失敗（10200095）或從未送出（10200047）才換號；查詢失敗、缺 TradeStatus 或其他代碼一律不換號
+    const unexpected = results && results.find((r) => !['0', '10200047', '10200095'].includes(r.TradeStatus));
+    if (!results || unexpected) {
+      if (unexpected) console.error('[ECPay] Unexpected TradeStatus:', unexpected.TradeStatus, unexpected.MerchantTradeNo);
       return res.status(503).json({ data: null, error: 'ECPAY_UNAVAILABLE', message: '暫時無法連線綠界確認付款狀態，請稍後再試。' });
     }
 
-    const tradeNo = baseTradeNo + String(Number(prevTradeNo.slice(baseTradeNo.length)) + 1).padStart(2, '0');
-    if (tradeNo.length > 20) {
+    const tradeNo = nextTradeNo(order);
+    if (!tradeNo) {
       return res.status(400).json({ data: null, error: 'PAYMENT_ATTEMPT_LIMIT', message: '付款嘗試次數已達上限' });
     }
     // 查詢期間可能有併發請求已換號或訂單已付款：僅在編號與狀態未變時換號
@@ -546,10 +545,11 @@ router.post('/:id/check-payment', async (req, res) => {
   }
 
   try {
-    const result = await queryTradeInfo(order.merchant_trade_no);
+    const results = await queryIssuedTrades(order);
+    const paid = results.find((r) => r.TradeStatus === '1');
 
-    if (result.TradeStatus === '1') {
-      db.prepare('UPDATE orders SET status = ? WHERE id = ?').run('paid', order.id);
+    if (paid) {
+      db.prepare('UPDATE orders SET status = ?, merchant_trade_no = ? WHERE id = ?').run('paid', paid.MerchantTradeNo, order.id);
       const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
       const items = db.prepare('SELECT product_name, product_price, quantity FROM order_items WHERE order_id = ?').all(order.id);
       return res.json({
@@ -561,7 +561,7 @@ router.post('/:id/check-payment', async (req, res) => {
 
     const items = db.prepare('SELECT product_name, product_price, quantity FROM order_items WHERE order_id = ?').all(order.id);
     return res.json({
-      data: { ...order, items, ecpay_trade_status: result.TradeStatus },
+      data: { ...order, items, ecpay_trade_status: results[0].TradeStatus },
       error: null,
       message: '尚未完成付款，請稍後再查詢'
     });

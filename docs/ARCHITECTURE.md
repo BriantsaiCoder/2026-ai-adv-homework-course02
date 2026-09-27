@@ -337,7 +337,7 @@ server.js
 | recipient_address | TEXT | NOT NULL | 收件地址 |
 | total_amount | INTEGER | NOT NULL | 訂單總金額 |
 | status | TEXT | NOT NULL DEFAULT 'pending', CHECK IN ('pending','paid','failed') | 訂單狀態 |
-| merchant_trade_no | TEXT | 可為 NULL | 最近一次付款嘗試的綠界交易編號（建立時為 order_no 去除連字號，如 `ORD20260412A1B2C`；每次前往付款改為加至少兩位數的遞增序號，如 `ORD20260412A1B2C01`） |
+| merchant_trade_no | TEXT | 可為 NULL | 最近一次付款嘗試的綠界交易編號（建立時為 order_no 去除連字號，如 `ORD20260412A1B2C`；每次前往付款改為加兩位數遞增序號，如 `ORD20260412A1B2C01`，最多 99 次）；標記已付款時改為實際付款的編號 |
 | created_at | TEXT | NOT NULL DEFAULT datetime('now') | 建立時間 |
 
 ### order_items
@@ -386,7 +386,7 @@ server.js
   ├─ 前端導向 /orders/:orderId（訂單確認頁），使用者點「前往綠界付款」
   │
   ├─ POST /api/orders/:id/payment-attempt（JWT，限訂單擁有者）
-  │    └─ QueryTradeInfo 確認目前編號未付款（已付款則標記 paid → 409；僅 TradeStatus 0／10200095／10200047 換號；查詢、逾時、驗證失敗、缺 TradeStatus 或其他代碼 → 503，不換號）
+  │    └─ QueryTradeInfo 由新到舊確認曾發出的每個編號皆未付款（任一已付款則標記 paid → 409；僅 TradeStatus 0／10200095／10200047 換號；查詢、逾時、驗證失敗、缺 TradeStatus 或其他代碼 → 503，不換號）
   │    └─ 產生本次嘗試的 MerchantTradeNo（order_no 去連字號 + 遞增序號）
   │    └─ 條件式更新寫回訂單（編號與 pending 狀態未變才寫入；併發落敗或查詢期間已付款 → 409）
   │    └─ Server 產生 ECPay AIO 參數（MerchantTradeNo, TotalAmount, ItemName 等）
@@ -400,9 +400,9 @@ server.js
   │
   └─ 付款驗證
        └─ POST /api/orders/:id/check-payment
-            ├─ 呼叫綠界 QueryTradeInfo API（TimeStamp 每次重新產生）
+            ├─ 由新到舊對曾發出的每個編號呼叫綠界 QueryTradeInfo API（TimeStamp 每次重新產生），遇到已付款即停
             ├─ 驗證回應 CheckMacValue＋MerchantTradeNo 與查詢編號相符（失敗 → throw → 500 ECPAY_QUERY_ERROR）
-            ├─ TradeStatus === '1' → 更新訂單狀態為 paid
+            ├─ 任一 TradeStatus === '1' → 更新訂單狀態為 paid，merchant_trade_no 改為該編號
             └─ 其他 → 回傳「尚未完成付款」
 ```
 
