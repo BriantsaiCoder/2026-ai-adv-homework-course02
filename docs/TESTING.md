@@ -45,7 +45,7 @@ export default defineConfig({
 | `tests/products.test.js` | 商品列表、分頁、詳情、404 | 依賴種子商品存在 |
 | `tests/cart.test.js` | 加入購物車、查看、更新數量、刪除、訪客 vs 登入 | 依賴商品存在 + 使用者認證 |
 | `tests/orders.test.js` | 建立訂單、空購物車、認證要求、訂單列表、詳情、付款 | `beforeAll` 自建購物車品項 |
-| `tests/ecpayPayment.test.js` | 綠界付款嘗試換號（MerchantTradeNo 不重複、check-payment 查最新編號）、目前編號已付款不換號、查詢失敗或回應缺 TradeStatus 不換號（stub 全域 `fetch`，不連綠界） | 依賴商品存在 + 使用者認證 |
+| `tests/ecpayPayment.test.js` | 綠界付款嘗試換號（MerchantTradeNo 不重複、check-payment 查最新編號）、目前編號已付款不換號、查詢失敗或未簽章錯誤回應時不換號並導向 `?payment=unavailable`、回應被竄改或挪用他筆交易時 check-payment 回 500 且換號流程不標記 paid（stub 全域 `fetch` 回傳已簽章回應，不連綠界）；另以綠界 staging 真實回應原文（含 ItemName 帶 `+`、`%` 的交易、從未送出編號的 `10200047`）驗證解析與簽章算法相容 | 依賴商品存在 + 使用者認證 |
 | `tests/adminProducts.test.js` | 後台商品列表、新增、更新、刪除、權限檢查 | 依賴 admin 帳號 |
 | `tests/adminOrders.test.js` | 後台訂單列表、詳情、狀態篩選 | `beforeAll` 自建訂單 + admin 帳號 |
 

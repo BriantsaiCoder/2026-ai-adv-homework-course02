@@ -386,7 +386,7 @@ server.js
   ├─ 前端導向 /orders/:orderId（訂單確認頁），使用者點「前往綠界付款」
   │
   ├─ GET /ecpay/payment/:orderId
-  │    └─ QueryTradeInfo 確認目前編號未付款（已付款則標記 paid 並導回訂單頁）
+  │    └─ QueryTradeInfo 確認目前編號未付款（已付款則標記 paid 並導回訂單頁；查詢、逾時或驗簽失敗 → 導回 ?payment=unavailable，不換號）
   │    └─ 產生本次嘗試的 MerchantTradeNo（order_no 去連字號 + 遞增序號）並寫回訂單
   │    └─ Server 產生 ECPay AIO 參數（MerchantTradeNo, TotalAmount, ItemName 等）
   │    └─ 計算 CheckMacValue（SHA256，ECPay 專用 URL 編碼）
@@ -400,6 +400,7 @@ server.js
   └─ 付款驗證
        └─ POST /api/orders/:id/check-payment
             ├─ 呼叫綠界 QueryTradeInfo API（TimeStamp 每次重新產生）
+            ├─ 驗證回應 CheckMacValue＋已付款時 MerchantTradeNo 相符（失敗 → throw → 500 ECPAY_QUERY_ERROR）
             ├─ TradeStatus === '1' → 更新訂單狀態為 paid
             └─ 其他 → 回傳「尚未完成付款」
 ```
