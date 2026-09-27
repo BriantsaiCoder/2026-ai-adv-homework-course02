@@ -133,6 +133,8 @@ describe('ECPay payment attempts', () => {
     ]);
 
     expect(responses.map((r) => r.status).sort()).toEqual([200, 302]);
+    // 落敗者須走條件式更新失敗的導回，而非閘門逾時造成的查詢失敗（?payment=unavailable）
+    expect(responses.find((r) => r.status === 302).headers.location).toBe('/orders/' + orderId);
     const form = responses.find((r) => r.status === 200);
     expect(db.prepare('SELECT merchant_trade_no FROM orders WHERE id = ?').get(orderId).merchant_trade_no).toBe(formTradeNo(form.text));
   });
