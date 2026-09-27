@@ -21,7 +21,7 @@ description: 錄影版綠界結帳 E2E：先以 Playwright 開始錄影，再完
 
 1. 取一個 timestamp（`date +%Y%m%d-%H%M%S`）。影片與 `e2e-ecpay-checkout` 的截圖共用 `.playwright-mcp/e2e-ecpay-checkout/<timestamp>/`，執行該 skill 時沿用同一個 timestamp。
 2. 影片路徑用絕對路徑：`<repo 絕對路徑>/.playwright-mcp/e2e-ecpay-checkout/<timestamp>/e2e-ecpay-checkout.webm`。`browser_run_code_unsafe` 的相對路徑不以 repo 為基準。
-3. 先照 `e2e-ecpay-checkout` 第 1 步確認 3001 server 就緒，再 `browser_navigate` 到 `http://localhost:3001/login`，才開始錄影。否則影片開頭會是一段 `about:blank` 或前次殘留頁面（可能已顯示登入狀態），server 啟動或等待權限核准時更會拉長。之後呼叫該 skill 時，它的第 1 步會直接沿用這個 server，第 2 步重新導到 `/login` 也無妨。
+3. 先照 `e2e-ecpay-checkout` 第 1 步確認 3001 server 就緒，再 `browser_navigate` 到 `http://localhost:3001/login`，並照其第 2 步清掉殘留登入（只回傳布林值的檢查；為 `true` 時 `localStorage.clear()` 後重新整理），才開始錄影。否則影片開頭會是一段 `about:blank` 或前次殘留頁面，header 還可能顯示前次的登入狀態；server 啟動或等待權限核准時前導更長。
 
 ## 3. 開始錄影
 
@@ -39,7 +39,7 @@ async (page) => {
 
 ## 4. 執行 e2e-ecpay-checkout
 
-以 Skill 工具呼叫 `e2e-ecpay-checkout`，照其全部步驟跑到回報前。同一 session 內若剛改過該 skill，Skill 工具回傳的可能是 session 快取的舊內文；以 `.claude/skills/e2e-ecpay-checkout/SKILL.md` 磁碟版為準。錄影期間：
+以 Skill 工具呼叫 `e2e-ecpay-checkout`，照其全部步驟跑到回報前；其第 1 步已在本 skill 第 2 步完成，錄影中略過，免得畫面停在登入頁等 shell 檢查。同一 session 內若剛改過該 skill，Skill 工具回傳的可能是 session 快取的舊內文；以 `.claude/skills/e2e-ecpay-checkout/SKILL.md` 磁碟版為準。錄影期間：
 
 - 不要 `browser_close`、不要開新分頁或切換分頁。錄影只錄開始時的那個分頁，關閉會中斷錄影。綠界付款全程都在同一分頁跳轉，不需要新分頁。
 - 該 skill 任一步失敗時，照它的規則截圖並停在該步，然後**仍要執行第 5 步停止錄影**。失敗過程的影片正是除錯最需要的證據。
