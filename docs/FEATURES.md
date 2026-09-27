@@ -341,9 +341,9 @@
 - 訂單不存在或非本人所有 → 404
 - 訂單狀態非 pending → 400 `INVALID_STATUS`
 - 每次付款嘗試產生新的 MerchantTradeNo（綠界拒收重複編號，錯誤代碼 10300028「訂單編號重覆」）：order_no 去除連字號 + 至少兩位數的遞增序號（`ORD20260412A1B2C01`、`…02`…，總長上限 20 字元（約 9999 次），超過 → 400 `PAYMENT_ATTEMPT_LIMIT`），並寫回訂單 `merchant_trade_no`
-- 換號前先以 QueryTradeInfo 查詢訂單目前的 `merchant_trade_no`：已付款（TradeStatus `1`）→ 更新訂單為 `paid` 並回 409 `ORDER_PAID`，避免依序重試時重複扣款；只有未付款（`0`）、交易失敗（`10200095`）或從未送出（`10200047`，綠界 staging 實測此回應帶有效 CheckMacValue）才換號；查詢失敗、逾時（10 秒）、驗證失敗（CheckMacValue 不符或缺少、回應的 MerchantTradeNo 與查詢編號不符）、回應缺 TradeStatus 或其他代碼 → 503 `ECPAY_UNAVAILABLE`（前端顯示「暫時無法連線綠界」），不換號；非預期的 TradeStatus 另記 log
+- 換號前先以 QueryTradeInfo 由新到舊查詢訂單曾發出的每個編號（目前序號…`01`，最後是原始編號），遇到已付款即停：任一編號已付款（TradeStatus `1`）→ 更新訂單為 `paid`、`merchant_trade_no` 改為該已付款編號，並回 409 `ORDER_PAID`，避免重複扣款；只有每個編號皆為未付款（`0`）、交易失敗（`10200095`）或從未送出（`10200047`，綠界 staging 實測此回應帶有效 CheckMacValue）才換號；查詢失敗、逾時（10 秒）、驗證失敗（CheckMacValue 不符或缺少、回應的 MerchantTradeNo 與查詢編號不符）、回應缺 TradeStatus 或其他代碼（任一編號）→ 503 `ECPAY_UNAVAILABLE`（前端顯示「暫時無法連線綠界」），不換號；非預期的 TradeStatus 另記 log。編號超過上限時先回 400，不查詢
 - 換號以條件式更新寫入（編號與 `pending` 狀態皆未變才寫入）：併發請求只有一個取得新編號，其餘回 409 `PAYMENT_ATTEMPT_CONFLICT`；查詢期間訂單已付款亦不回傳表單參數
-- 限制：只追蹤最近一次嘗試。較早的嘗試若在換號之後才完成付款，`check-payment` 查不到該筆，例如：兩個分頁同時開著綠界付款頁，其中一個付款途中另一個重新前往付款（已以 stub 重現）；或在較早嘗試取得 ATM／超商代碼後重新付款，再以舊代碼繳費（未實測）
+- 較早的嘗試可能在換號之後才完成付款（例如兩個分頁同時開著綠界付款頁，或在較早嘗試取得 ATM／超商代碼後重新付款、再以舊代碼繳費），故換號與 `check-payment` 都查詢每個曾發出的編號；查詢次數隨嘗試次數線性成長
 - 產生 ECPay 所需參數：MerchantID、MerchantTradeNo、MerchantTradeDate（台灣時區）、TotalAmount、ItemName（商品名稱以 `#` 連接，上限 400 bytes）等
 - 計算 CheckMacValue（SHA256，ECPay 專用 URL 編碼）
 - 設定 ClientBackURL 為 `/orders/:orderId?payment=pending`（付款後瀏覽器導回）
@@ -382,10 +382,10 @@
 1. 查詢訂單（驗證 user_id 與訂單存在）
 2. 訂單已非 pending → 直接回傳現有狀態
 3. 訂單無 `merchant_trade_no` → 400
-4. 以訂單目前的 `merchant_trade_no`（最近一次付款嘗試）呼叫綠界 `POST /Cashier/QueryTradeInfo/V5`（TimeStamp 每次重新產生，有效期 3 分鐘）
+4. 由新到舊對訂單曾發出的每個編號（目前的 `merchant_trade_no`…`01`，最後是原始編號）呼叫綠界 `POST /Cashier/QueryTradeInfo/V5`（TimeStamp 每次重新產生，有效期 3 分鐘），遇到已付款即停
 5. `queryTradeInfo` 驗證回應中的 CheckMacValue（staging 實測回應皆附簽章），且回應的 MerchantTradeNo 須等於本次查詢編號；簽章不符／缺少或編號不符 → 視為查詢失敗，回 500 `ECPAY_QUERY_ERROR`，不更新訂單
-6. `TradeStatus === '1'` → 更新訂單狀態為 `paid`，回傳成功
-7. 其他 TradeStatus → 回傳「尚未完成付款」
+6. 任一編號 `TradeStatus === '1'` → 更新訂單狀態為 `paid`、`merchant_trade_no` 改為該已付款編號，回傳成功
+7. 皆未付款 → 回傳「尚未完成付款」（`ecpay_trade_status` 為最近一次嘗試的狀態）
 
 **錯誤情境**：
 
@@ -406,6 +406,7 @@
 | `verifyCheckMacValue(params, hashKey, hashIV)` | 時序安全驗證簽章（crypto.timingSafeEqual） |
 | `getMerchantTradeDate()` | 產生台灣時區日期字串（yyyy/MM/dd HH:mm:ss） |
 | `buildAioFormParams(order, items, config)` | 產生 ECPay AIO 表單參數（含 CheckMacValue），回傳 `{ action, fields }` |
+| `queryIssuedTrades(order, config)` | 由新到舊對訂單曾發出的每個 MerchantTradeNo 呼叫 `queryTradeInfo`，遇到已付款即停；任一查詢 throw 即整體 throw。供付款嘗試與 `check-payment` 共用 |
 | `queryTradeInfo(merchantTradeNo, config)` | 呼叫 QueryTradeInfo API 查詢交易狀態；回應值未經 URL 編碼（`+`、`%` 原樣回傳，`&`、`=` 由綠界轉為空白），故以 `&`／首個 `=` 切分、不做解碼；回應 CheckMacValue 驗證失敗，或回應的 MerchantTradeNo 與查詢編號不符即 throw，呼叫端不會拿到未驗證的 TradeStatus |
 
 ### 測試資訊

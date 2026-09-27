@@ -164,6 +164,21 @@ async function queryTradeInfo(merchantTradeNo, config) {
   return result;
 }
 
+// 由新到舊查詢訂單曾發出的每個 MerchantTradeNo（目前序號…01，最後是原始編號），遇到已付款即停：
+// 較早的嘗試可能在換號後才完成付款（如 ATM／超商代碼），只查最新編號會漏記
+// ponytail: 查詢次數隨嘗試次數線性成長；嘗試次數變多時改為記錄實際送出的編號或接 ReturnURL 通知
+async function queryIssuedTrades(order, config) {
+  const base = order.order_no.replace(/-/g, '');
+  const current = order.merchant_trade_no || base;
+  const results = [];
+  for (let n = Number(current.slice(base.length)); n >= 0; n--) {
+    const result = await queryTradeInfo(n ? base + String(n).padStart(2, '0') : base, config);
+    results.push(result);
+    if (result.TradeStatus === '1') break;
+  }
+  return results;
+}
+
 module.exports = {
   ECPAY_CONFIG,
   ecpayUrlEncode,
@@ -172,4 +187,5 @@ module.exports = {
   getMerchantTradeDate,
   buildAioFormParams,
   queryTradeInfo,
+  queryIssuedTrades,
 };

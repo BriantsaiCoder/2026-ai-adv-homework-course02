@@ -2,7 +2,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database');
 const authMiddleware = require('../middleware/authMiddleware');
-const { queryTradeInfo, buildAioFormParams } = require('../utils/ecpay');
+const { queryIssuedTrades, buildAioFormParams } = require('../utils/ecpay');
 
 const router = express.Router();
 
@@ -464,26 +464,28 @@ router.post('/:id/payment-attempt', async (req, res, next) => {
 
     const baseTradeNo = order.order_no.replace(/-/g, '');
     const prevTradeNo = order.merchant_trade_no || baseTradeNo;
-
-    // 換號前確認目前編號未付款，避免依序重試時對已付款訂單重複扣款（從未送出的編號回 10200047，照常換號）
-    const result = await queryTradeInfo(prevTradeNo).catch((err) => {
-      console.error('[ECPay] QueryTradeInfo error:', err.message);
-      return null;
-    });
-    if (result && result.TradeStatus === '1') {
-      db.prepare('UPDATE orders SET status = ? WHERE id = ?').run('paid', order.id);
-      return res.status(409).json({ data: null, error: 'ORDER_PAID', message: '此訂單已付款' });
-    }
-    // 只有確認未付款（0）、交易失敗（10200095）或從未送出（10200047）才換號；查詢失敗、缺 TradeStatus 或其他代碼一律不換號
-    if (!result || !['0', '10200047', '10200095'].includes(result.TradeStatus)) {
-      if (result) console.error('[ECPay] Unexpected TradeStatus:', result.TradeStatus, prevTradeNo);
-      return res.status(503).json({ data: null, error: 'ECPAY_UNAVAILABLE', message: '暫時無法連線綠界確認付款狀態，請稍後再試。' });
-    }
-
     const tradeNo = baseTradeNo + String(Number(prevTradeNo.slice(baseTradeNo.length)) + 1).padStart(2, '0');
     if (tradeNo.length > 20) {
       return res.status(400).json({ data: null, error: 'PAYMENT_ATTEMPT_LIMIT', message: '付款嘗試次數已達上限' });
     }
+
+    // 換號前確認曾發出的編號皆未付款，避免對已付款訂單重複扣款（從未送出的編號回 10200047，照常換號）
+    const results = await queryIssuedTrades(order).catch((err) => {
+      console.error('[ECPay] QueryTradeInfo error:', err.message);
+      return null;
+    });
+    const paid = results && results.find((r) => r.TradeStatus === '1');
+    if (paid) {
+      db.prepare('UPDATE orders SET status = ?, merchant_trade_no = ? WHERE id = ?').run('paid', paid.MerchantTradeNo, order.id);
+      return res.status(409).json({ data: null, error: 'ORDER_PAID', message: '此訂單已付款' });
+    }
+    // 只有皆確認未付款（0）、交易失敗（10200095）或從未送出（10200047）才換號；查詢失敗、缺 TradeStatus 或其他代碼一律不換號
+    const unexpected = results && results.find((r) => !['0', '10200047', '10200095'].includes(r.TradeStatus));
+    if (!results || unexpected) {
+      if (unexpected) console.error('[ECPay] Unexpected TradeStatus:', unexpected.TradeStatus, unexpected.MerchantTradeNo);
+      return res.status(503).json({ data: null, error: 'ECPAY_UNAVAILABLE', message: '暫時無法連線綠界確認付款狀態，請稍後再試。' });
+    }
+
     // 查詢期間可能有併發請求已換號或訂單已付款：僅在編號與狀態未變時換號
     const claimed = db.prepare('UPDATE orders SET merchant_trade_no = ? WHERE id = ? AND status = ? AND merchant_trade_no IS ?')
       .run(tradeNo, order.id, 'pending', order.merchant_trade_no).changes;
@@ -546,10 +548,11 @@ router.post('/:id/check-payment', async (req, res) => {
   }
 
   try {
-    const result = await queryTradeInfo(order.merchant_trade_no);
+    const results = await queryIssuedTrades(order);
+    const paid = results.find((r) => r.TradeStatus === '1');
 
-    if (result.TradeStatus === '1') {
-      db.prepare('UPDATE orders SET status = ? WHERE id = ?').run('paid', order.id);
+    if (paid) {
+      db.prepare('UPDATE orders SET status = ?, merchant_trade_no = ? WHERE id = ?').run('paid', paid.MerchantTradeNo, order.id);
       const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
       const items = db.prepare('SELECT product_name, product_price, quantity FROM order_items WHERE order_id = ?').all(order.id);
       return res.json({
@@ -561,7 +564,7 @@ router.post('/:id/check-payment', async (req, res) => {
 
     const items = db.prepare('SELECT product_name, product_price, quantity FROM order_items WHERE order_id = ?').all(order.id);
     return res.json({
-      data: { ...order, items, ecpay_trade_status: result.TradeStatus },
+      data: { ...order, items, ecpay_trade_status: results[0].TradeStatus },
       error: null,
       message: '尚未完成付款，請稍後再查詢'
     });

@@ -12,13 +12,15 @@ function tradeNoOf(orderId) {
   return db.prepare('SELECT merchant_trade_no FROM orders WHERE id = ?').get(orderId).merchant_trade_no;
 }
 
-// 回應依綠界規則簽章並回帶查詢編號；signed 覆寫簽章前欄位（他筆交易的真實回應），tampered 覆寫簽章後欄位（竄改）；tradeStatus 為 undefined 時回應不含 TradeStatus
+// 回應依綠界規則簽章並回帶查詢編號；signed 覆寫簽章前欄位（他筆交易的真實回應），tampered 覆寫簽章後欄位（竄改）；tradeStatus 為 undefined 時回應不含 TradeStatus，為函式時依查詢編號決定
 function stubQueryTradeInfo(tradeStatus, { signed = {}, tampered = {} } = {}) {
   const fetchMock = vi.fn(async (url, init) => {
+    const tradeNo = new URLSearchParams(init.body).get('MerchantTradeNo');
+    const status = typeof tradeStatus === 'function' ? tradeStatus(tradeNo) : tradeStatus;
     const fields = {
       MerchantID: ECPAY_CONFIG.merchantId,
-      MerchantTradeNo: new URLSearchParams(init.body).get('MerchantTradeNo'),
-      ...(tradeStatus !== undefined && { TradeStatus: tradeStatus }),
+      MerchantTradeNo: tradeNo,
+      ...(status !== undefined && { TradeStatus: status }),
       ...signed,
     };
     fields.CheckMacValue = generateCheckMacValue(fields, ECPAY_CONFIG.hashKey, ECPAY_CONFIG.hashIV);
@@ -107,6 +109,24 @@ describe('ECPay payment attempts', () => {
     expect(retry.status).toBe(409);
     expect(retry.body.error).toBe('ORDER_PAID');
     expect(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status).toBe('paid');
+  });
+
+  it.each([
+    ['payment-attempt', (token, orderId) => attempt(token, orderId), 409],
+    ['check-payment', (token, orderId) => request(app).post(`/api/orders/${orderId}/check-payment`).set('Authorization', `Bearer ${token}`), 200],
+  ])('%s finds a payment completed on an earlier trade no after renumbering', async (_label, call, expectedStatus) => {
+    const { token, orderId } = await createOrder();
+    stubQueryTradeInfo('0');
+    const firstNo = (await attempt(token, orderId)).body.data.fields.MerchantTradeNo;
+    await attempt(token, orderId);
+    // 例如在第一次嘗試取得 ATM 代碼，換號後才繳費
+    stubQueryTradeInfo((tradeNo) => (tradeNo === firstNo ? '1' : '0'));
+
+    const res = await call(token, orderId);
+
+    expect(res.status).toBe(expectedStatus);
+    expect(db.prepare('SELECT status, merchant_trade_no FROM orders WHERE id = ?').get(orderId))
+      .toEqual({ status: 'paid', merchant_trade_no: firstNo });
   });
 
   it.each(['10200047', '10200095'])('issues the next trade no when ECPay reports %s (never sent / failed)', async (tradeStatus) => {
