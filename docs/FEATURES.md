@@ -375,7 +375,7 @@
 | `verifyCheckMacValue(params, hashKey, hashIV)` | 時序安全驗證簽章（crypto.timingSafeEqual） |
 | `getMerchantTradeDate()` | 產生台灣時區日期字串（yyyy/MM/dd HH:mm:ss） |
 | `buildAioFormHtml(order, items, config)` | 產生自動送出的 ECPay 付款表單 HTML |
-| `queryTradeInfo(merchantTradeNo, config)` | 呼叫 QueryTradeInfo API 查詢交易狀態；回應 CheckMacValue 驗證失敗，或已付款回應的 MerchantTradeNo 與查詢編號不符即 throw，呼叫端不會拿到未驗證的 TradeStatus |
+| `queryTradeInfo(merchantTradeNo, config)` | 呼叫 QueryTradeInfo API 查詢交易狀態；回應值未經 URL 編碼（`+`、`%` 原樣回傳，`&`、`=` 由綠界轉為空白），故以 `&`／首個 `=` 切分、不做解碼；回應 CheckMacValue 驗證失敗，或已付款回應的 MerchantTradeNo 與查詢編號不符即 throw，呼叫端不會拿到未驗證的 TradeStatus |
 
 ### 測試資訊
 

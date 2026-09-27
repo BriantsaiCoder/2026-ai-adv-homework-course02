@@ -1,6 +1,6 @@
 const { app, request, registerUser } = require('./setup');
 const db = require('../src/database');
-const { generateCheckMacValue, verifyCheckMacValue, ECPAY_CONFIG } = require('../src/utils/ecpay');
+const { generateCheckMacValue, queryTradeInfo, ECPAY_CONFIG } = require('../src/utils/ecpay');
 
 function formTradeNo(html) {
   return html.match(/name="MerchantTradeNo" value="([^"]+)"/)[1];
@@ -16,7 +16,8 @@ function stubQueryTradeInfo(tradeStatus, { signed = {}, tampered = {} } = {}) {
       ...signed,
     };
     fields.CheckMacValue = generateCheckMacValue(fields, ECPAY_CONFIG.hashKey, ECPAY_CONFIG.hashIV);
-    return { ok: true, text: async () => new URLSearchParams({ ...fields, ...tampered }).toString() };
+    const body = Object.entries({ ...fields, ...tampered }).map(([k, v]) => `${k}=${v}`).join('&');
+    return { ok: true, text: async () => body };
   });
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
@@ -121,13 +122,35 @@ describe('ECPay payment attempts', () => {
   });
 });
 
-describe('ECPay QueryTradeInfo signature', () => {
-  // 綠界 staging（MerchantID 3002607）實際回傳的已付款回應原文；確認驗簽與綠界算法相容，避免 fail-closed 誤拒真實付款
-  it('accepts a genuine staging response', () => {
-    const body = 'CustomField1=&CustomField2=&CustomField3=&CustomField4=&HandlingCharge=60&ItemName=粉色玫瑰花束 x1#紫色鬱金香盆栽 x1&MerchantID=3002607&MerchantTradeNo=ORD20260927D300D&PaymentDate=2026/09/27 16:30:59&PaymentType=Credit_CreditCard&PaymentTypeChargeFee=61&StoreID=&TradeAmt=2430&TradeDate=2026/09/27 16:28:39&TradeNo=2609271628390061&TradeStatus=1&CheckMacValue=A75D7DC7111B63171B25659CD256D8B0BEE62F85D003F6E8B1C9D79F0567E388';
-    const params = Object.fromEntries(new URLSearchParams(body));
+describe('ECPay QueryTradeInfo genuine staging responses', () => {
+  // 綠界 staging（MerchantID 3002607）實際回應原文，值未經 URL 編碼；確認解析與驗簽和綠界相容，避免 fail-closed 誤拒
+  // 綠界公開的 staging 測試金鑰（同 src/utils/ecpay.js 預設值），寫死以免環境變數覆寫影響 fixture
+  const STAGING = { ...ECPAY_CONFIG, hashKey: 'pwFHCqoQZGmho4w6', hashIV: 'EkRm7iFT261dpevs' }; // gitleaks:allow
+  const PAID = 'CustomField1=&CustomField2=&CustomField3=&CustomField4=&HandlingCharge=60&ItemName=粉色玫瑰花束 x1#紫色鬱金香盆栽 x1&MerchantID=3002607&MerchantTradeNo=ORD20260927D300D&PaymentDate=2026/09/27 16:30:59&PaymentType=Credit_CreditCard&PaymentTypeChargeFee=61&StoreID=&TradeAmt=2430&TradeDate=2026/09/27 16:28:39&TradeNo=2609271628390061&TradeStatus=1&CheckMacValue=A75D7DC7111B63171B25659CD256D8B0BEE62F85D003F6E8B1C9D79F0567E388';
+  // 送出的 ItemName 為 'A%41=B+C 50% x1#玫瑰'，綠界把 = 轉為空白，+ 與 % 原樣回傳
+  const UNPAID_SPECIAL_CHARS = 'CustomField1=&CustomField2=&CustomField3=&CustomField4=&HandlingCharge=0&ItemName=A%41 B+C 50% x1#玫瑰&MerchantID=3002607&MerchantTradeNo=CMVT1790500783393&PaymentDate=&PaymentType=&PaymentTypeChargeFee=0&StoreID=&TradeAmt=100&TradeDate=2026/09/27 17:19:43&TradeNo=2609271719430090&TradeStatus=0&CheckMacValue=A4CB290D6DEC3243B24F8D2DC18F6F88EDA20EA79636A2DF1028CAEF7AD3294A';
 
-    expect(verifyCheckMacValue(params, 'pwFHCqoQZGmho4w6', 'EkRm7iFT261dpevs')).toBe(true);
-    expect(verifyCheckMacValue({ ...params, TradeAmt: '1' }, 'pwFHCqoQZGmho4w6', 'EkRm7iFT261dpevs')).toBe(false);
+  function stubResponse(body) {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, text: async () => body })));
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it.each([
+    ['ORD20260927D300D', PAID, '1', '粉色玫瑰花束 x1#紫色鬱金香盆栽 x1'],
+    ['CMVT1790500783393', UNPAID_SPECIAL_CHARS, '0', 'A%41 B+C 50% x1#玫瑰'],
+  ])('parses and verifies %s', async (tradeNo, body, tradeStatus, itemName) => {
+    stubResponse(body);
+    const result = await queryTradeInfo(tradeNo, STAGING);
+
+    expect(result.TradeStatus).toBe(tradeStatus);
+    expect(result.ItemName).toBe(itemName);
+  });
+
+  it('rejects a genuine response once a field is altered', async () => {
+    stubResponse(PAID.replace('TradeAmt=2430', 'TradeAmt=1'));
+    await expect(queryTradeInfo('ORD20260927D300D', STAGING)).rejects.toThrow('CheckMacValue');
   });
 });
