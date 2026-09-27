@@ -116,14 +116,15 @@ describe('Cart API', () => {
     const guestSession = 'merge-login-' + Date.now();
     const { stock } = (await request(app).get(`/api/products/${productId}`)).body.data;
 
+    // 2 + (stock - 1) exceeds stock only if summed: distinguishes sum+cap from overwrite/max/uncapped
     await request(app)
       .post('/api/cart')
       .set('Authorization', `Bearer ${token}`)
-      .send({ productId, quantity: 1 });
+      .send({ productId, quantity: 2 });
     await request(app)
       .post('/api/cart')
       .set('X-Session-Id', guestSession)
-      .send({ productId, quantity: stock });
+      .send({ productId, quantity: stock - 1 });
 
     const loginRes = await request(app)
       .post('/api/auth/login')
@@ -137,6 +138,11 @@ describe('Cart API', () => {
     expect(userCart.body.data.items).toEqual([
       expect.objectContaining({ product_id: productId, quantity: stock })
     ]);
+
+    const guestCart = await request(app)
+      .get('/api/cart')
+      .set('X-Session-Id', guestSession);
+    expect(guestCart.body.data.items.length).toBe(0);
   });
 
   it('should fail to add non-existent product to cart', async () => {
