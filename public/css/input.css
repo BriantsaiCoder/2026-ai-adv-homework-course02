@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme {
+  --color-rose-primary: #C4727F;
+  --color-rose-dark: #A85B67;
+  --color-rose-light: #E8A5AE;
+  --color-apricot: #D4956A;
+  --color-sage: #7EA584;
+  --color-cream: #FBF8F4;
+  --color-blush: #FFF1EC;
+  --color-rose-bg: #FDEAE4;
+  --color-text-primary: #2C2A28;
+  --color-text-secondary: #6B6560;
+  --color-text-muted: #9A948E;
+}
+
+body {
+  font-family: 'Noto Sans TC', sans-serif;
+  background-color: var(--color-cream);
+  color: var(--color-text-primary);
+}

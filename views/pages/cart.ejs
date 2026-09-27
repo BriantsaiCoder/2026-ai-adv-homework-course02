@@ -1,0 +1,112 @@
+<div id="app">
+  <h1 class="text-2xl font-bold text-text-primary mb-6" style="font-family: 'Noto Serif TC', serif;">購物車</h1>
+
+  <div v-if="loading" class="flex justify-center py-12">
+    <div class="w-8 h-8 border-4 border-rose-primary border-t-transparent rounded-full animate-spin"></div>
+  </div>
+
+  <div v-else-if="items.length === 0" class="text-center py-12">
+    <div class="text-4xl mb-3">&#128722;</div>
+    <p class="text-text-secondary mb-1">購物車是空的</p>
+    <p class="text-text-muted text-sm mb-4">快去挑選喜歡的花束吧！</p>
+    <a href="/" class="inline-block bg-rose-primary text-white px-6 py-2 rounded-full text-sm hover:bg-rose-dark transition-colors">去逛逛</a>
+  </div>
+
+  <template v-else>
+    <!-- Free shipping banner -->
+    <div v-if="total < 500" class="bg-blush rounded-xl p-3 mb-6 text-sm text-rose-primary text-center">
+      &#127803; 再買 NT$ {{ (500 - total).toLocaleString() }} 即可享免運費！
+    </div>
+    <div v-else class="bg-sage/10 rounded-xl p-3 mb-6 text-sm text-sage text-center">
+      &#10003; 已達免運門檻！
+    </div>
+
+    <!-- Cart Items -->
+    <div class="bg-white rounded-2xl shadow-sm overflow-hidden mb-6">
+      <div
+        v-for="item in items"
+        :key="item.id"
+        class="flex items-center gap-4 p-4 border-b border-gray-50 last:border-0"
+      >
+        <img
+          :src="item.product.image_url || 'https://images.unsplash.com/photo-1490750967868-88aa4f44baee?w=100'"
+          :alt="item.product.name"
+          class="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+        />
+        <div class="flex-1 min-w-0">
+          <h3 class="font-medium text-text-primary text-sm truncate">{{ item.product.name }}</h3>
+          <p class="text-rose-primary text-sm">NT$ {{ item.product.price.toLocaleString() }}</p>
+        </div>
+
+        <!-- Quantity Controls -->
+        <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+          <button
+            @click="updateQuantity(item.id, item.quantity - 1)"
+            :disabled="item.quantity <= 1"
+            class="w-8 h-8 flex items-center justify-center hover:bg-gray-50 text-text-secondary text-sm disabled:opacity-40"
+          >
+            -
+          </button>
+          <span class="w-8 h-8 flex items-center justify-center text-sm border-x border-gray-200">
+            {{ item.quantity }}
+          </span>
+          <button
+            @click="updateQuantity(item.id, item.quantity + 1)"
+            :disabled="item.quantity >= item.product.stock"
+            class="w-8 h-8 flex items-center justify-center hover:bg-gray-50 text-text-secondary text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            +
+          </button>
+        </div>
+
+        <p class="text-text-primary font-medium text-sm w-24 text-right">
+          NT$ {{ (item.product.price * item.quantity).toLocaleString() }}
+        </p>
+
+        <button
+          @click="confirmDelete(item.id)"
+          class="text-text-muted hover:text-red-500 transition-colors text-sm ml-2"
+        >
+          &#128465;
+        </button>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="bg-white rounded-2xl shadow-sm p-6">
+      <div class="flex justify-between items-center mb-2 text-sm">
+        <span class="text-text-secondary">商品小計</span>
+        <span class="text-text-primary">NT$ {{ total.toLocaleString() }}</span>
+      </div>
+      <div class="flex justify-between items-center mb-4 text-sm">
+        <span class="text-text-secondary">運費</span>
+        <span class="text-text-primary">{{ total >= 500 ? '免運' : 'NT$ 150' }}</span>
+      </div>
+      <div class="border-t border-gray-100 pt-4 flex justify-between items-center">
+        <span class="font-bold text-text-primary">總計</span>
+        <span class="font-bold text-xl text-rose-primary">
+          NT$ {{ (total + (total >= 500 ? 0 : 150)).toLocaleString() }}
+        </span>
+      </div>
+      <button
+        @click="goCheckout"
+        class="w-full mt-4 bg-rose-primary text-white py-3 rounded-full text-sm font-medium hover:bg-rose-dark transition-colors"
+      >
+        前往結帳
+      </button>
+    </div>
+  </template>
+
+  <!-- Confirm Dialog -->
+  <div v-if="confirmVisible" class="fixed inset-0 z-50 flex items-center justify-center">
+    <div class="absolute inset-0 bg-black/40" @click="confirmVisible = false"></div>
+    <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6 text-center">
+      <h3 class="text-lg font-semibold text-text-primary mb-2">確認移除</h3>
+      <p class="text-text-secondary text-sm mb-6">確定要從購物車中移除這個商品嗎？</p>
+      <div class="flex gap-3 justify-center">
+        <button @click="confirmVisible = false" class="px-4 py-2 text-sm rounded-lg border border-gray-200 text-text-secondary hover:bg-gray-50">取消</button>
+        <button @click="handleDelete" class="px-4 py-2 text-sm rounded-lg bg-red-500 text-white hover:bg-red-600">確認移除</button>
+      </div>
+    </div>
+  </div>
+</div>

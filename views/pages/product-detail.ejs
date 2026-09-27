@@ -1,0 +1,78 @@
+<div id="app" data-product-id="<%= productId %>">
+  <div v-if="loading" class="flex justify-center py-12">
+    <div class="w-8 h-8 border-4 border-rose-primary border-t-transparent rounded-full animate-spin"></div>
+  </div>
+
+  <div v-else-if="notFound" class="text-center py-16">
+    <div class="text-5xl mb-4">&#127804;</div>
+    <h2 class="text-xl font-medium text-text-primary mb-2">找不到此商品</h2>
+    <a href="/" class="text-rose-primary hover:text-rose-dark text-sm">回到首頁</a>
+  </div>
+
+  <div v-else-if="product" class="flex flex-col md:flex-row gap-8 md:gap-12">
+    <!-- Left: Image -->
+    <div class="md:w-1/2">
+      <div class="rounded-2xl overflow-hidden shadow-sm">
+        <img
+          :src="product.image_url || 'https://images.unsplash.com/photo-1490750967868-88aa4f44baee?w=600'"
+          :alt="product.name"
+          class="w-full aspect-square object-cover"
+        />
+      </div>
+    </div>
+
+    <!-- Right: Info -->
+    <div class="md:w-1/2">
+      <h1 class="text-2xl md:text-3xl font-bold text-text-primary mb-2" style="font-family: 'Noto Serif TC', serif;">
+        {{ product.name }}
+      </h1>
+      <p class="text-3xl text-rose-primary font-bold mb-4">NT$ {{ product.price.toLocaleString() }}</p>
+
+      <div class="mb-6">
+        <span class="text-sage text-sm">&#10003; 尚有 {{ product.stock }} 件</span>
+      </div>
+
+      <p class="text-text-secondary leading-relaxed mb-6">{{ product.description }}</p>
+
+      <!-- Quantity Selector -->
+      <div class="flex items-center gap-4 mb-6">
+        <span class="text-sm text-text-secondary">數量</span>
+        <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+          <button
+            @click="decrease"
+            class="w-10 h-10 flex items-center justify-center hover:bg-gray-50 text-text-secondary transition-colors"
+          >
+            -
+          </button>
+          <span class="w-12 h-10 flex items-center justify-center text-sm border-x border-gray-200">
+            {{ quantity }}
+          </span>
+          <button
+            @click="increase"
+            class="w-10 h-10 flex items-center justify-center hover:bg-gray-50 text-text-secondary transition-colors"
+          >
+            +
+          </button>
+        </div>
+      </div>
+
+      <button
+        @click="addToCart"
+        :disabled="adding || product.stock <= 0"
+        class="w-full bg-rose-primary text-white py-3 rounded-full text-sm font-medium hover:bg-rose-dark transition-colors disabled:opacity-50"
+      >
+        {{ product.stock <= 0 ? '已售完' : '加入購物車' }}
+      </button>
+
+      <!-- Purchase Notes -->
+      <div class="mt-8 bg-blush rounded-xl p-5">
+        <h3 class="font-medium text-text-primary mb-2 text-sm">購買須知</h3>
+        <ul class="text-text-muted text-xs space-y-1.5">
+          <li>- 花材依據季節供應，實際花束可能略有差異</li>
+          <li>- 台北市區可享當日配送服務</li>
+          <li>- 消費滿 NT$ 500 享免運優惠</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,125 @@
+<div id="app">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-text-primary">商品管理</h1>
+    <button
+      @click="openCreate"
+      class="bg-rose-primary text-white px-4 py-2 rounded-lg text-sm hover:bg-rose-dark transition-colors"
+    >
+      + 新增商品
+    </button>
+  </div>
+
+  <div v-if="loading" class="flex justify-center py-12">
+    <div class="w-8 h-8 border-4 border-rose-primary border-t-transparent rounded-full animate-spin"></div>
+  </div>
+
+  <template v-else>
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="bg-gray-50 text-text-muted">
+            <th class="text-left px-4 py-3 font-normal">圖片</th>
+            <th class="text-left px-4 py-3 font-normal">商品名稱</th>
+            <th class="text-right px-4 py-3 font-normal">價格</th>
+            <th class="text-right px-4 py-3 font-normal">庫存</th>
+            <th class="text-right px-4 py-3 font-normal">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="product in products" :key="product.id" class="border-t border-gray-50">
+            <td class="px-4 py-3">
+              <img
+                :src="product.image_url || 'https://images.unsplash.com/photo-1490750967868-88aa4f44baee?w=100'"
+                :alt="product.name"
+                class="w-12 h-12 rounded-lg object-cover"
+              />
+            </td>
+            <td class="px-4 py-3 text-text-primary">{{ product.name }}</td>
+            <td class="px-4 py-3 text-right text-text-secondary">NT$ {{ product.price.toLocaleString() }}</td>
+            <td class="px-4 py-3 text-right text-text-secondary">{{ product.stock }}</td>
+            <td class="px-4 py-3 text-right">
+              <button
+                @click="openEdit(product)"
+                class="text-rose-primary hover:text-rose-dark text-xs border border-rose-primary rounded px-2 py-1 mr-2"
+              >
+                編輯
+              </button>
+              <button
+                @click="confirmDeleteFn(product.id)"
+                class="text-red-500 hover:text-red-600 text-xs border border-red-300 rounded px-2 py-1"
+              >
+                刪除
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div v-if="pagination.totalPages > 1" class="flex justify-center gap-2 mt-6">
+      <button
+        v-for="p in pagination.totalPages"
+        :key="p"
+        @click="loadProducts(p)"
+        class="w-10 h-10 rounded-full text-sm transition-colors"
+        :class="p === pagination.page ? 'bg-rose-primary text-white' : 'bg-white text-text-secondary hover:bg-rose-bg'"
+      >
+        {{ p }}
+      </button>
+    </div>
+  </template>
+
+  <!-- Product Modal -->
+  <div v-if="modalVisible" class="fixed inset-0 z-50 flex items-center justify-center">
+    <div class="absolute inset-0 bg-black/40" @click="modalVisible = false"></div>
+    <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6">
+      <h3 class="text-lg font-semibold text-text-primary mb-4">
+        {{ editingProduct ? '編輯商品' : '新增商品' }}
+      </h3>
+      <form @submit.prevent="handleSave" class="space-y-4">
+        <div>
+          <label class="block text-sm text-text-secondary mb-1">商品名稱 *</label>
+          <input v-model="form.name" type="text" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-rose-primary" />
+        </div>
+        <div>
+          <label class="block text-sm text-text-secondary mb-1">商品描述</label>
+          <textarea v-model="form.description" rows="3" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-rose-primary"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm text-text-secondary mb-1">價格 *</label>
+            <input v-model.number="form.price" type="number" min="1" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-rose-primary" />
+          </div>
+          <div>
+            <label class="block text-sm text-text-secondary mb-1">庫存 *</label>
+            <input v-model.number="form.stock" type="number" min="0" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-rose-primary" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm text-text-secondary mb-1">圖片 URL</label>
+          <input v-model="form.image_url" type="text" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-rose-primary" />
+        </div>
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" @click="modalVisible = false" class="px-4 py-2 text-sm rounded-lg border border-gray-200 text-text-secondary hover:bg-gray-50">取消</button>
+          <button type="submit" :disabled="saving" class="px-4 py-2 text-sm rounded-lg bg-rose-primary text-white hover:bg-rose-dark disabled:opacity-50">
+            {{ saving ? '儲存中...' : '儲存' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Confirm Delete Dialog -->
+  <div v-if="confirmVisible" class="fixed inset-0 z-50 flex items-center justify-center">
+    <div class="absolute inset-0 bg-black/40" @click="confirmVisible = false"></div>
+    <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6 text-center">
+      <h3 class="text-lg font-semibold text-text-primary mb-2">確認刪除</h3>
+      <p class="text-text-secondary text-sm mb-6">確定要刪除這個商品嗎？此操作無法復原。</p>
+      <div class="flex gap-3 justify-center">
+        <button @click="confirmVisible = false" class="px-4 py-2 text-sm rounded-lg border border-gray-200 text-text-secondary hover:bg-gray-50">取消</button>
+        <button @click="handleDelete" class="px-4 py-2 text-sm rounded-lg bg-red-500 text-white hover:bg-red-600">確認刪除</button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<%- include('../partials/head') %>
+<body class="min-h-screen flex flex-col">
+  <%- include('../partials/admin-header') %>
+  <div class="flex flex-1">
+    <%- include('../partials/admin-sidebar') %>
+    <main class="flex-1 p-8 bg-cream">
+      <%- body %>
+    </main>
+  </div>
+  <%- include('../partials/footer') %>
+  <%- include('../partials/notification') %>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/notification.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      if (!Auth.requireAdmin()) return;
+      var el = document.getElementById('admin-username');
+      if (el) el.textContent = Auth.getUser()?.name || '';
+    });
+  </script>
+  <% if (typeof pageScript !== 'undefined' && pageScript) { %>
+  <script src="/js/pages/<%= pageScript %>.js"></script>
+  <% } %>
+</body>
+</html>
