@@ -17,15 +17,17 @@ description: 以 Playwright MCP 對本專案（花漾生活，localhost:3001）�
 
 ## 1. 啟動 server
 
-1. `lsof -nP -iTCP:3001 -sTCP:LISTEN`；已有 listener 就沿用，並 `curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/` 確認 200。
+1. `lsof -nP -iTCP:3001 -sTCP:LISTEN`；已有 listener 時先確認它跑的是本 repo 的現行程式碼，再沿用，並 `curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/` 確認 200：
+   - `lsof -a -p <pid> -d cwd -Fn` 的 cwd 須為本 repo root，否則是別的專案，停止並回報。
+   - `ps -o lstart= -p <pid>` 的啟動時間須晚於 `find src views public/js -type f -print0 | xargs -0 stat -f '%Sm %N' -t '%Y-%m-%d %H:%M:%S' | sort | tail -1` 的最後修改時間；較舊表示跑的是舊程式碼（Node 不會 hot reload），回報並徵得使用者同意後再重啟，不要驗舊程式碼得出假 PASS。Claude Code sandbox 內 `ps` 會被擋（`operation not permitted`），這是唯讀指令，改在 sandbox 外執行。
 2. 沒有就 `npm run css:build`，再背景執行 `node server.js`，看到 `Server running on port 3001` 才繼續。
    - 若報 `Fatal: JWT_SECRET is not set`：`server.js` 靠 dotenv 讀 `.env`，Claude Code 的 Bash sandbox 禁讀 `.env*`。改在 sandbox 外背景啟動（`dangerouslyDisableSandbox: true` + `run_in_background`）。不要讀、印或寫死 `.env` 內容。
 3. 記下 server 是否由本次啟動，收尾時回報。
 
 ## 2. 乾淨起點與登入
 
-1. 帳密取自 `src/database.js` 的 `seedAdminUser()` 預設值（可被 `ADMIN_EMAIL`／`ADMIN_PASSWORD` 覆寫；若使用者另給則用使用者的）。
-2. `browser_navigate` → `http://localhost:3001/login`，以 `browser_evaluate` 確認 `localStorage.flower_token` 為空；有值表示殘留前次登入，執行 `localStorage.clear()` 後重新整理，讓登入步驟真的被驗到。
+1. 帳密用 `admin@hexschool.com`／`12345678`，即 `src/database.js` `seedAdminUser()` 的預設值；使用者另給則用使用者的。若 `.env` 以 `ADMIN_EMAIL`／`ADMIN_PASSWORD` 覆寫導致登入失敗，向使用者索取，不要讀 `.env`。
+2. `browser_navigate` → `http://localhost:3001/login`，以 `browser_evaluate` 執行 `() => localStorage.getItem('flower_token') !== null`，只回傳布林值；不要回傳 token 本身，否則 JWT 明文會進到對話紀錄。為 `true` 表示殘留前次登入，執行 `localStorage.clear()` 後重新整理，讓登入步驟真的被驗到。
 3. 填 textbox「Email」「密碼」，按 button「登入」。
 4. 成功條件：導回 `/`，header 出現 button「登出」。截 `01-logged-in.png`。
 
@@ -38,7 +40,7 @@ async () => {
   const h = { Authorization: 'Bearer ' + localStorage.getItem('flower_token') };
   const cart = await fetch('/api/cart', { headers: h }).then(r => r.json());
   for (const it of cart.data.items) await fetch('/api/cart/' + it.id, { method: 'DELETE', headers: h });
-  const { data } = await fetch('/api/products').then(r => r.json());
+  const { data } = await fetch('/api/products?limit=100').then(r => r.json());  // 預設只回 10 筆
   const p = data.products.find(p => p.stock > 0);
   return { removed: cart.data.items.length, id: p?.id, name: p?.name, price: p?.price, stock: p?.stock };
 }
@@ -50,8 +52,8 @@ async () => {
 
 ## 4. 加入購物車並結帳
 
-1. `browser_navigate` → `/products/<id>`，按 button「加入購物車 NT$ …」（主商品那顆，含價格；下方「你可能也喜歡」的「加入購物車」不要按）。
-2. `browser_navigate` → `/cart`，確認「共 1 項商品」、總計等於商品價＋運費（小計未滿 NT$ 500 加 NT$ 150，否則免運）。截 `02-cart.png`。
+1. `browser_navigate` → `http://localhost:3001/products/<id>`（一律寫完整 URL：Playwright MCP 會把 `/cart` 這類相對路徑補成 `https:///cart`），按 button「加入購物車 NT$ …」（主商品那顆，含價格；下方「你可能也喜歡」的「加入購物車」不要按）。
+2. `browser_navigate` → `http://localhost:3001/cart`，確認「共 1 項商品」、總計等於商品價＋運費（小計未滿 NT$ 500 加 NT$ 150，否則免運）。截 `02-cart.png`。
 3. 按 button「前往結帳」→ `/checkout`。填 textbox「收件人姓名」「Email」「收件地址」，用明顯的測試假資料（例：`E2E 測試收件人`／seed admin email／`台北市信義區測試路 1 號`）。
 4. 按 button「送出訂單」→ 導向 `/orders/<orderId>`，等 heading「確認訂單，前往付款」出現，狀態「待付款」。從 URL 記 `orderId`、從頁面記「訂單編號」。截 `03-order-created.png`。
 
