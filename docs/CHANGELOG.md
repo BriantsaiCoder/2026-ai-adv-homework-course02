@@ -16,7 +16,7 @@
 - 訂單詳情頁面（order-detail.ejs / order-detail.js）：原「付款成功/失敗」模擬按鈕改為「查詢付款狀態」與「前往付款」按鈕；從綠界導回時自動觸發付款狀態查詢
 
 ### Fixed
-- 重新前往綠界付款被拒（10300028「訂單編號重覆」）：`GET /ecpay/payment/:orderId` 每次付款嘗試改發新的 MerchantTradeNo（order_no 去除連字號 + 兩位數遞增序號）並寫回訂單，`check-payment` 查詢最近一次嘗試；換號前先查詢前次編號，已付款則直接標記 `paid`，避免重複扣款
+- 重新前往綠界付款被拒（10300028「訂單編號重覆」）：`GET /ecpay/payment/:orderId` 每次付款嘗試改發新的 MerchantTradeNo（order_no 去除連字號 + 至少兩位數的遞增序號）並寫回訂單，`check-payment` 查詢最近一次嘗試；換號前先查詢目前編號，已付款則直接標記 `paid`，避免依序重試時重複扣款；`queryTradeInfo` 加 10 秒逾時
 
 ## [1.0.0] - 2026-04-12
 

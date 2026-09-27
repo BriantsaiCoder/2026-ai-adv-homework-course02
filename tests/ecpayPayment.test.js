@@ -17,10 +17,11 @@ function stubQueryTradeInfo(tradeStatus) {
 async function createOrder() {
   const { token } = await registerUser();
   const prodRes = await request(app).get('/api/products');
+  const productId = prodRes.body.data.products[0].id;
   await request(app)
     .post('/api/cart')
     .set('Authorization', `Bearer ${token}`)
-    .send({ productId: prodRes.body.data.products[0].id, quantity: 1 });
+    .send({ productId, quantity: 1 });
   const res = await request(app)
     .post('/api/orders')
     .set('Authorization', `Bearer ${token}`)
@@ -29,6 +30,8 @@ async function createOrder() {
       recipientEmail: 'recipient@example.com',
       recipientAddress: '台北市測試路 123 號',
     });
+  // 測試共用 database.sqlite，歸還建單扣掉的庫存，避免耗盡後其他測試失敗
+  db.prepare('UPDATE products SET stock = stock + 1 WHERE id = ?').run(productId);
   return { token, orderId: res.body.data.id };
 }
 
@@ -62,16 +65,26 @@ describe('ECPay payment attempts', () => {
     expect(new URLSearchParams(fetchMock.mock.calls[0][1].body).get('MerchantTradeNo')).toBe(secondNo);
   });
 
-  it('marks the order paid instead of issuing a new attempt when the previous one was paid', async () => {
+  it('marks the order paid instead of issuing a new attempt when the stored trade no was paid', async () => {
+    // 修正前建立的訂單，merchant_trade_no 仍是原始編號且可能已送過綠界
     const { orderId } = await createOrder();
-    stubQueryTradeInfo('0');
-    await request(app).get('/ecpay/payment/' + orderId);
-
     stubQueryTradeInfo('1');
     const retry = await request(app).get('/ecpay/payment/' + orderId);
 
     expect(retry.status).toBe(302);
     expect(retry.headers.location).toBe('/orders/' + orderId);
     expect(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status).toBe('paid');
+  });
+
+  it('keeps the current trade no and redirects to the order page when QueryTradeInfo fails', async () => {
+    const { orderId } = await createOrder();
+    const before = db.prepare('SELECT merchant_trade_no FROM orders WHERE id = ?').get(orderId).merchant_trade_no;
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 500 })));
+
+    const res = await request(app).get('/ecpay/payment/' + orderId);
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe(`/orders/${orderId}?payment=pending`);
+    expect(db.prepare('SELECT merchant_trade_no FROM orders WHERE id = ?').get(orderId).merchant_trade_no).toBe(before);
   });
 });

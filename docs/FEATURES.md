@@ -322,8 +322,9 @@
 - 從 DB 讀取訂單與品項資訊
 - 訂單不存在 → 404
 - 訂單狀態非 pending → 302 重導至訂單詳情頁
-- 每次付款嘗試產生新的 MerchantTradeNo（綠界拒收重複編號，錯誤代碼 10300028「訂單編號重覆」）：order_no 去除連字號 + 兩位數遞增序號（`ORD20260412A1B2C01`、`…02`…，上限 20 字元，超過 → 400），並寫回訂單 `merchant_trade_no`
-- 前一次嘗試已送綠界時，換號前先以 QueryTradeInfo 查詢前一編號：已付款（TradeStatus `1`）→ 更新訂單為 `paid` 並 302 至訂單詳情頁，避免重複扣款；查詢失敗 → 302 至 `/orders/:orderId?payment=pending`
+- 每次付款嘗試產生新的 MerchantTradeNo（綠界拒收重複編號，錯誤代碼 10300028「訂單編號重覆」）：order_no 去除連字號 + 至少兩位數的遞增序號（`ORD20260412A1B2C01`、`…02`…，總長上限 20 字元（約 9999 次），超過 → 400），並寫回訂單 `merchant_trade_no`
+- 換號前先以 QueryTradeInfo 查詢訂單目前的 `merchant_trade_no`：已付款（TradeStatus `1`）→ 更新訂單為 `paid` 並 302 至訂單詳情頁，避免依序重試時重複扣款；從未送出的編號回 `10200047`，照常換號；查詢失敗或逾時（10 秒）→ 302 至 `/orders/:orderId?payment=pending`，不換號
+- 限制：只追蹤最近一次嘗試。若使用者在較早的嘗試取得 ATM／超商代碼（取號後 TradeStatus 仍為 `0`）後又重新付款，再以舊代碼繳費，`check-payment` 查不到該筆
 - 回應帶 `Cache-Control: no-store`，使用者從綠界按上一頁時會重新取號，而非重送舊表單
 - 產生 ECPay 所需參數：MerchantID、MerchantTradeNo、MerchantTradeDate（台灣時區）、TotalAmount、ItemName（商品名稱以 `#` 連接，上限 400 bytes）等
 - 計算 CheckMacValue（SHA256，ECPay 專用 URL 編碼）
@@ -336,7 +337,7 @@
 | 參數 | 值 | 說明 |
 |------|------|------|
 | MerchantID | 環境變數 `ECPAY_MERCHANT_ID` | 測試：3002607 |
-| MerchantTradeNo | 本次付款嘗試的編號 | order_no 去除連字號 + 兩位數遞增序號，最多 20 字元 |
+| MerchantTradeNo | 本次付款嘗試的編號 | order_no 去除連字號 + 至少兩位數的遞增序號，最多 20 字元 |
 | PaymentType | `aio` | 固定值 |
 | ChoosePayment | `ALL` | 顯示所有付款方式 |
 | EncryptType | `1` | SHA256 |

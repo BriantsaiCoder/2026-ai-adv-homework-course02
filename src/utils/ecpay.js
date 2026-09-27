@@ -161,6 +161,7 @@ async function queryTradeInfo(merchantTradeNo, config) {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
+    signal: AbortSignal.timeout(10000),
   });
 
   if (!response.ok) {
