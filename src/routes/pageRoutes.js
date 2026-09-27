@@ -77,8 +77,9 @@ router.get('/ecpay/payment/:orderId', async function (req, res, next) {
       console.error('[ECPay] QueryTradeInfo error:', err.message);
       return null;
     });
-    if (!result) {
-      return res.redirect('/orders/' + order.id + '?payment=pending');
+    // 查詢失敗或回應缺 TradeStatus（錯誤回應）一律不換號
+    if (!result || !result.TradeStatus) {
+      return res.redirect('/orders/' + order.id + '?payment=unavailable');
     }
     if (result.TradeStatus === '1') {
       db.prepare('UPDATE orders SET status = ? WHERE id = ?').run('paid', order.id);

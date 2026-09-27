@@ -23,6 +23,7 @@ createApp({
       failed: { text: '付款失敗，請重試。', cls: 'bg-red-50 text-red-600 border border-red-100' },
       cancel: { text: '付款已取消。', cls: 'bg-apricot/10 text-apricot border border-apricot/20' },
       pending: { text: '付款處理中，請點擊「查詢付款狀態」確認結果。', cls: 'bg-apricot/10 text-apricot border border-apricot/20' },
+      unavailable: { text: '暫時無法連線綠界確認付款狀態，請稍後再試。', cls: 'bg-apricot/10 text-apricot border border-apricot/20' },
     };
 
     async function checkPayment() {

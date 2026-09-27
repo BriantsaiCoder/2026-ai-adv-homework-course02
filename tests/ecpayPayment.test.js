@@ -30,8 +30,10 @@ async function createOrder() {
       recipientEmail: 'recipient@example.com',
       recipientAddress: '台北市測試路 123 號',
     });
-  // 測試共用 database.sqlite，歸還建單扣掉的庫存，避免耗盡後其他測試失敗
-  db.prepare('UPDATE products SET stock = stock + 1 WHERE id = ?').run(productId);
+  // 測試共用 database.sqlite，歸還本檔建單扣掉的庫存（其他測試檔仍會扣）
+  if (res.status === 201) {
+    db.prepare('UPDATE products SET stock = stock + 1 WHERE id = ?').run(productId);
+  }
   return { token, orderId: res.body.data.id };
 }
 
@@ -52,6 +54,8 @@ describe('ECPay payment attempts', () => {
     expect(first.status).toBe(200);
     expect(second.status).toBe(200);
     expect(secondNo).not.toBe(firstNo);
+    // 換號前查詢的是上一次送出的編號
+    expect(new URLSearchParams(fetchMock.mock.calls[1][1].body).get('MerchantTradeNo')).toBe(firstNo);
     for (const no of [firstNo, secondNo]) {
       expect(no).toMatch(/^[A-Za-z0-9]{1,20}$/);
     }
@@ -76,15 +80,18 @@ describe('ECPay payment attempts', () => {
     expect(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status).toBe('paid');
   });
 
-  it('keeps the current trade no and redirects to the order page when QueryTradeInfo fails', async () => {
+  it.each([
+    ['HTTP error', { ok: false, status: 500 }],
+    ['response without TradeStatus', { ok: true, text: async () => 'Error=TimeStamp expired' }],
+  ])('keeps the current trade no and redirects to the order page when QueryTradeInfo fails (%s)', async (_label, response) => {
     const { orderId } = await createOrder();
     const before = db.prepare('SELECT merchant_trade_no FROM orders WHERE id = ?').get(orderId).merchant_trade_no;
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 500 })));
+    vi.stubGlobal('fetch', vi.fn(async () => response));
 
     const res = await request(app).get('/ecpay/payment/' + orderId);
 
     expect(res.status).toBe(302);
-    expect(res.headers.location).toBe(`/orders/${orderId}?payment=pending`);
+    expect(res.headers.location).toBe(`/orders/${orderId}?payment=unavailable`);
     expect(db.prepare('SELECT merchant_trade_no FROM orders WHERE id = ?').get(orderId).merchant_trade_no).toBe(before);
   });
 });
