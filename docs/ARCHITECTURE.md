@@ -386,7 +386,8 @@ server.js
   ├─ 前端導向 /orders/:orderId（訂單確認頁），使用者點「前往綠界付款」
   │
   ├─ GET /ecpay/payment/:orderId
-  │    └─ QueryTradeInfo 確認目前編號未付款（已付款則標記 paid 並導回訂單頁；查詢、逾時或驗簽失敗 → 導回 ?payment=unavailable，不換號）
+  │    └─ QueryTradeInfo 確認目前編號未付款（已付款則標記 paid 並導回訂單頁；僅 TradeStatus 0／10200095／10200047 換號；查詢、逾時、驗證失敗、缺 TradeStatus 或其他代碼 → 導回 ?payment=unavailable，不換號）
+  │    └─ 條件式更新寫入新編號（編號與 pending 狀態未變才寫入；併發落敗者導回訂單頁）
   │    └─ 產生本次嘗試的 MerchantTradeNo（order_no 去連字號 + 遞增序號）並寫回訂單
   │    └─ Server 產生 ECPay AIO 參數（MerchantTradeNo, TotalAmount, ItemName 等）
   │    └─ 計算 CheckMacValue（SHA256，ECPay 專用 URL 編碼）

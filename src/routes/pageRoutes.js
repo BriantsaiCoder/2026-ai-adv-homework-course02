@@ -77,20 +77,25 @@ router.get('/ecpay/payment/:orderId', async function (req, res, next) {
       console.error('[ECPay] QueryTradeInfo error:', err.message);
       return null;
     });
-    // 查詢失敗或回應缺 TradeStatus（錯誤回應）一律不換號
-    if (!result || !result.TradeStatus) {
-      return res.redirect('/orders/' + order.id + '?payment=unavailable');
-    }
-    if (result.TradeStatus === '1') {
+    if (result && result.TradeStatus === '1') {
       db.prepare('UPDATE orders SET status = ? WHERE id = ?').run('paid', order.id);
       return res.redirect('/orders/' + order.id);
+    }
+    // 只有確認未付款（0）、交易失敗（10200095）或從未送出（10200047）才換號；查詢失敗、缺 TradeStatus 或其他代碼一律不換號
+    if (!result || !['0', '10200047', '10200095'].includes(result.TradeStatus)) {
+      return res.redirect('/orders/' + order.id + '?payment=unavailable');
     }
 
     const tradeNo = baseTradeNo + String(Number(prevTradeNo.slice(baseTradeNo.length)) + 1).padStart(2, '0');
     if (tradeNo.length > 20) {
       return res.status(400).send('付款嘗試次數已達上限');
     }
-    db.prepare('UPDATE orders SET merchant_trade_no = ? WHERE id = ?').run(tradeNo, order.id);
+    // 查詢期間可能有併發請求已換號或訂單已付款：僅在編號與狀態未變時換號，否則導回訂單頁
+    const claimed = db.prepare('UPDATE orders SET merchant_trade_no = ? WHERE id = ? AND status = ? AND merchant_trade_no IS ?')
+      .run(tradeNo, order.id, 'pending', order.merchant_trade_no).changes;
+    if (!claimed) {
+      return res.redirect('/orders/' + order.id);
+    }
 
     const items = db.prepare('SELECT product_name, product_price, quantity FROM order_items WHERE order_id = ?').all(order.id);
     const html = buildAioFormHtml({ ...order, merchant_trade_no: tradeNo }, items);

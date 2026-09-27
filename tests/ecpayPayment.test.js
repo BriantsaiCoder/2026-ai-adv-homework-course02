@@ -6,13 +6,13 @@ function formTradeNo(html) {
   return html.match(/name="MerchantTradeNo" value="([^"]+)"/)[1];
 }
 
-// 回應依綠界規則簽章並回帶查詢編號；signed 覆寫簽章前欄位（他筆交易的真實回應），tampered 覆寫簽章後欄位（竄改）
+// 回應依綠界規則簽章並回帶查詢編號；signed 覆寫簽章前欄位（他筆交易的真實回應），tampered 覆寫簽章後欄位（竄改）；tradeStatus 為 undefined 時回應不含 TradeStatus
 function stubQueryTradeInfo(tradeStatus, { signed = {}, tampered = {} } = {}) {
   const fetchMock = vi.fn(async (url, init) => {
     const fields = {
       MerchantID: ECPAY_CONFIG.merchantId,
       MerchantTradeNo: new URLSearchParams(init.body).get('MerchantTradeNo'),
-      TradeStatus: tradeStatus,
+      ...(tradeStatus !== undefined && { TradeStatus: tradeStatus }),
       ...signed,
     };
     fields.CheckMacValue = generateCheckMacValue(fields, ECPAY_CONFIG.hashKey, ECPAY_CONFIG.hashIV);
@@ -84,19 +84,54 @@ describe('ECPay payment attempts', () => {
     expect(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status).toBe('paid');
   });
 
+  it.each(['10200047', '10200095'])('issues the next trade no when ECPay reports %s (never sent / failed)', async (tradeStatus) => {
+    const { orderId } = await createOrder();
+    stubQueryTradeInfo(tradeStatus);
+
+    const res = await request(app).get('/ecpay/payment/' + orderId);
+
+    expect(res.status).toBe(200);
+    expect(formTradeNo(res.text)).toMatch(/01$/);
+  });
+
   it.each([
-    ['HTTP error', { ok: false, status: 500 }],
-    ['unsigned error response without TradeStatus', { ok: true, text: async () => 'Error=TimeStamp expired' }],
-  ])('keeps the current trade no and redirects to the order page when QueryTradeInfo fails (%s)', async (_label, response) => {
+    ['HTTP error', () => vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 500 })))],
+    ['unsigned error response', () => vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, text: async () => 'Error=TimeStamp expired' })))],
+    ['signed response without TradeStatus', () => stubQueryTradeInfo(undefined)],
+    ['signed unknown TradeStatus', () => stubQueryTradeInfo('10299999')],
+  ])('keeps the current trade no and redirects to the order page when QueryTradeInfo fails (%s)', async (_label, stub) => {
     const { orderId } = await createOrder();
     const before = db.prepare('SELECT merchant_trade_no FROM orders WHERE id = ?').get(orderId).merchant_trade_no;
-    vi.stubGlobal('fetch', vi.fn(async () => response));
+    stub();
 
     const res = await request(app).get('/ecpay/payment/' + orderId);
 
     expect(res.status).toBe(302);
     expect(res.headers.location).toBe(`/orders/${orderId}?payment=unavailable`);
     expect(db.prepare('SELECT merchant_trade_no FROM orders WHERE id = ?').get(orderId).merchant_trade_no).toBe(before);
+  });
+
+  it('lets only one of two concurrent attempts claim the next trade no', async () => {
+    const { orderId } = await createOrder();
+    const fetchMock = stubQueryTradeInfo('0');
+    const reply = fetchMock.getMockImplementation();
+    // 兩個請求都讀到同一個目前編號後才放行查詢，重現併發換號
+    let release;
+    const bothQueried = new Promise((resolve) => { release = resolve; });
+    fetchMock.mockImplementation(async (...args) => {
+      if (fetchMock.mock.calls.length === 2) release();
+      await bothQueried;
+      return reply(...args);
+    });
+
+    const responses = await Promise.all([
+      request(app).get('/ecpay/payment/' + orderId),
+      request(app).get('/ecpay/payment/' + orderId),
+    ]);
+
+    expect(responses.map((r) => r.status).sort()).toEqual([200, 302]);
+    const form = responses.find((r) => r.status === 200);
+    expect(db.prepare('SELECT merchant_trade_no FROM orders WHERE id = ?').get(orderId).merchant_trade_no).toBe(formTradeNo(form.text));
   });
 
   it('check-payment rejects tampered or other-trade responses and accepts a genuine one', async () => {
