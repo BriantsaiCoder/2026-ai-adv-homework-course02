@@ -79,7 +79,9 @@ describe('ECPay payment attempts', () => {
       .set('Authorization', `Bearer ${token}`);
 
     expect(check.status).toBe(200);
-    expect(new URLSearchParams(fetchMock.mock.calls[0][1].body).get('MerchantTradeNo')).toBe(secondNo);
+    // 由新到舊查到原始編號
+    expect(fetchMock.mock.calls.map(([, init]) => new URLSearchParams(init.body).get('MerchantTradeNo')))
+      .toEqual([secondNo, firstNo, firstNo.slice(0, -2)]);
   });
 
   it('only lets the order owner start an attempt', async () => {
@@ -200,16 +202,51 @@ describe('ECPay payment attempts', () => {
     expect(tradeNoOf(orderId)).toBe(before);
   });
 
-  it('rejects the attempt once the next trade no would exceed 20 characters', async () => {
+  it('rejects a new attempt after 99 attempts but still detects a paid order', async () => {
     const { token, orderId } = await createOrder();
     const { order_no } = db.prepare('SELECT order_no FROM orders WHERE id = ?').get(orderId);
-    db.prepare('UPDATE orders SET merchant_trade_no = ? WHERE id = ?').run(order_no.replace(/-/g, '') + '9999', orderId);
+    db.prepare('UPDATE orders SET merchant_trade_no = ? WHERE id = ?').run(order_no.replace(/-/g, '') + '99', orderId);
+    const fetchMock = stubQueryTradeInfo('0');
+
+    const limited = await attempt(token, orderId);
+
+    expect(limited.status).toBe(400);
+    expect(limited.body.error).toBe('PAYMENT_ATTEMPT_LIMIT');
+    expect(fetchMock).toHaveBeenCalledTimes(100);
+
+    stubQueryTradeInfo((tradeNo) => (tradeNo.endsWith('99') ? '1' : '0'));
+    const paid = await attempt(token, orderId);
+
+    expect(paid.status).toBe(409);
+    expect(paid.body.error).toBe('ORDER_PAID');
+  });
+
+  it.each([
+    ['HTTP error', 500, (firstNo) => {
+      const fetchMock = stubQueryTradeInfo('0');
+      const reply = fetchMock.getMockImplementation();
+      fetchMock.mockImplementation(async (url, init) => (
+        new URLSearchParams(init.body).get('MerchantTradeNo') === firstNo ? { ok: false, status: 500 } : reply(url, init)
+      ));
+    }],
+    ['unknown TradeStatus', 200, (firstNo) => stubQueryTradeInfo((tradeNo) => (tradeNo === firstNo ? '10299999' : '0'))],
+  ])('keeps the current trade no when an earlier trade no cannot be confirmed unpaid (%s)', async (_label, checkStatus, stub) => {
+    const { token, orderId } = await createOrder();
     stubQueryTradeInfo('0');
+    const firstNo = (await attempt(token, orderId)).body.data.fields.MerchantTradeNo;
+    const secondNo = (await attempt(token, orderId)).body.data.fields.MerchantTradeNo;
+    stub(firstNo);
 
-    const res = await attempt(token, orderId);
+    const retry = await attempt(token, orderId);
+    const check = await request(app)
+      .post(`/api/orders/${orderId}/check-payment`)
+      .set('Authorization', `Bearer ${token}`);
 
-    expect(res.status).toBe(400);
-    expect(res.body.error).toBe('PAYMENT_ATTEMPT_LIMIT');
+    expect(retry.status).toBe(503);
+    expect(retry.body.error).toBe('ECPAY_UNAVAILABLE');
+    expect(check.status).toBe(checkStatus);
+    expect(db.prepare('SELECT status, merchant_trade_no FROM orders WHERE id = ?').get(orderId))
+      .toEqual({ status: 'pending', merchant_trade_no: secondNo });
   });
 
   it('check-payment rejects tampered or other-trade responses and accepts a genuine one', async () => {

@@ -164,15 +164,33 @@ async function queryTradeInfo(merchantTradeNo, config) {
   return result;
 }
 
+// 付款嘗試編號：order_no 去連字號為原始編號（序號 0），之後每次嘗試加兩位數序號（綠界拒收重複編號 10300028）
+// 上限同時限制每次請求對綠界的查詢次數（見 queryIssuedTrades）
+const MAX_PAYMENT_ATTEMPTS = 99;
+
+function tradeNoAt(order, attempt) {
+  const base = order.order_no.replace(/-/g, '');
+  return attempt ? base + String(attempt).padStart(2, '0') : base;
+}
+
+function attemptOf(order) {
+  const base = order.order_no.replace(/-/g, '');
+  return Number((order.merchant_trade_no || base).slice(base.length));
+}
+
+// 下一次付款嘗試的編號；已達上限回 null
+function nextTradeNo(order) {
+  const attempt = attemptOf(order) + 1;
+  return attempt > MAX_PAYMENT_ATTEMPTS ? null : tradeNoAt(order, attempt);
+}
+
 // 由新到舊查詢訂單曾發出的每個 MerchantTradeNo（目前序號…01，最後是原始編號），遇到已付款即停：
 // 較早的嘗試可能在換號後才完成付款（如 ATM／超商代碼），只查最新編號會漏記
-// ponytail: 查詢次數隨嘗試次數線性成長；嘗試次數變多時改為記錄實際送出的編號或接 ReturnURL 通知
+// ponytail: 每次請求最多查 MAX_PAYMENT_ATTEMPTS + 1 次；要再降低時改為記錄實際送出的編號或接 ReturnURL 通知
 async function queryIssuedTrades(order, config) {
-  const base = order.order_no.replace(/-/g, '');
-  const current = order.merchant_trade_no || base;
   const results = [];
-  for (let n = Number(current.slice(base.length)); n >= 0; n--) {
-    const result = await queryTradeInfo(n ? base + String(n).padStart(2, '0') : base, config);
+  for (let n = attemptOf(order); n >= 0; n--) {
+    const result = await queryTradeInfo(tradeNoAt(order, n), config);
     results.push(result);
     if (result.TradeStatus === '1') break;
   }
@@ -187,5 +205,6 @@ module.exports = {
   getMerchantTradeDate,
   buildAioFormParams,
   queryTradeInfo,
+  nextTradeNo,
   queryIssuedTrades,
 };

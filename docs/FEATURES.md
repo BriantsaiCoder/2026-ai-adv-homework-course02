@@ -322,7 +322,7 @@
 結帳送出訂單 → POST /api/orders 建立訂單（含 merchant_trade_no）
   → 前端導向 /orders/:orderId（訂單確認頁）→ 使用者點「前往綠界付款」
   → POST /api/orders/:id/payment-attempt（JWT）
-  → Server 查詢目前編號、換號，產生 ECPay 參數 + CheckMacValue → 回傳表單 action 與 fields
+  → Server 查詢曾發出的每個編號、換號，產生 ECPay 參數 + CheckMacValue → 回傳表單 action 與 fields
   → 前端建立表單 POST 至綠界付款頁 → 使用者完成付款
   → 綠界透過 ClientBackURL 導回 /orders/:orderId?payment=pending
   → 使用者點擊「查詢付款狀態」或頁面自動觸發查詢
@@ -340,10 +340,10 @@
 - 從 DB 讀取訂單（驗證 user_id）與品項資訊
 - 訂單不存在或非本人所有 → 404
 - 訂單狀態非 pending → 400 `INVALID_STATUS`
-- 每次付款嘗試產生新的 MerchantTradeNo（綠界拒收重複編號，錯誤代碼 10300028「訂單編號重覆」）：order_no 去除連字號 + 至少兩位數的遞增序號（`ORD20260412A1B2C01`、`…02`…，總長上限 20 字元（約 9999 次），超過 → 400 `PAYMENT_ATTEMPT_LIMIT`），並寫回訂單 `merchant_trade_no`
-- 換號前先以 QueryTradeInfo 由新到舊查詢訂單曾發出的每個編號（目前序號…`01`，最後是原始編號），遇到已付款即停：任一編號已付款（TradeStatus `1`）→ 更新訂單為 `paid`、`merchant_trade_no` 改為該已付款編號，並回 409 `ORDER_PAID`，避免重複扣款；只有每個編號皆為未付款（`0`）、交易失敗（`10200095`）或從未送出（`10200047`，綠界 staging 實測此回應帶有效 CheckMacValue）才換號；查詢失敗、逾時（10 秒）、驗證失敗（CheckMacValue 不符或缺少、回應的 MerchantTradeNo 與查詢編號不符）、回應缺 TradeStatus 或其他代碼（任一編號）→ 503 `ECPAY_UNAVAILABLE`（前端顯示「暫時無法連線綠界」），不換號；非預期的 TradeStatus 另記 log。編號超過上限時先回 400，不查詢
+- 每次付款嘗試產生新的 MerchantTradeNo（綠界拒收重複編號，錯誤代碼 10300028「訂單編號重覆」）：order_no 去除連字號 + 兩位數遞增序號（`ORD20260412A1B2C01`、`…02`…，最多 99 次，總長 18 字元；確認皆未付款後才檢查上限，超過 → 400 `PAYMENT_ATTEMPT_LIMIT`），並寫回訂單 `merchant_trade_no`
+- 換號前先以 QueryTradeInfo 由新到舊查詢訂單曾發出的每個編號（目前序號…`01`，最後是原始編號），遇到已付款即停：任一編號已付款（TradeStatus `1`）→ 更新訂單為 `paid`、`merchant_trade_no` 改為該已付款編號，並回 409 `ORDER_PAID`，避免重複扣款；只有每個編號皆為未付款（`0`）、交易失敗（`10200095`）或從未送出（`10200047`，綠界 staging 實測此回應帶有效 CheckMacValue）才換號；查詢失敗、逾時（10 秒）、驗證失敗（CheckMacValue 不符或缺少、回應的 MerchantTradeNo 與查詢編號不符）、回應缺 TradeStatus 或其他代碼（任一編號）→ 503 `ECPAY_UNAVAILABLE`（前端顯示「暫時無法連線綠界」），不換號；非預期的 TradeStatus 另記 log
 - 換號以條件式更新寫入（編號與 `pending` 狀態皆未變才寫入）：併發請求只有一個取得新編號，其餘回 409 `PAYMENT_ATTEMPT_CONFLICT`；查詢期間訂單已付款亦不回傳表單參數
-- 較早的嘗試可能在換號之後才完成付款（例如兩個分頁同時開著綠界付款頁，或在較早嘗試取得 ATM／超商代碼後重新付款、再以舊代碼繳費），故換號與 `check-payment` 都查詢每個曾發出的編號；查詢次數隨嘗試次數線性成長
+- 較早的嘗試可能在換號之後才完成付款（例如兩個分頁同時開著綠界付款頁，或在較早嘗試取得 ATM／超商代碼後重新付款、再以舊代碼繳費），故換號與 `check-payment` 都查詢每個曾發出的編號；查詢次數隨嘗試次數線性成長，上限 99 次嘗試使每次請求最多查 100 次
 - 產生 ECPay 所需參數：MerchantID、MerchantTradeNo、MerchantTradeDate（台灣時區）、TotalAmount、ItemName（商品名稱以 `#` 連接，上限 400 bytes）等
 - 計算 CheckMacValue（SHA256，ECPay 專用 URL 編碼）
 - 設定 ClientBackURL 為 `/orders/:orderId?payment=pending`（付款後瀏覽器導回）
@@ -355,7 +355,7 @@
 | 參數 | 值 | 說明 |
 |------|------|------|
 | MerchantID | 環境變數 `ECPAY_MERCHANT_ID` | 測試：3002607 |
-| MerchantTradeNo | 本次付款嘗試的編號 | order_no 去除連字號 + 至少兩位數的遞增序號，最多 20 字元 |
+| MerchantTradeNo | 本次付款嘗試的編號 | order_no 去除連字號 + 兩位數遞增序號（最多 99 次），18 字元 |
 | PaymentType | `aio` | 固定值 |
 | ChoosePayment | `ALL` | 顯示所有付款方式 |
 | EncryptType | `1` | SHA256 |
@@ -365,12 +365,12 @@
 | 狀態碼 | 錯誤碼 | 情境 |
 |--------|--------|------|
 | 400 | INVALID_STATUS | 訂單狀態非 pending |
-| 400 | PAYMENT_ATTEMPT_LIMIT | 下一個編號超過 20 字元 |
+| 400 | PAYMENT_ATTEMPT_LIMIT | 已達 99 次付款嘗試 |
 | 401 | UNAUTHORIZED | 未登入或 token 無效 |
 | 404 | NOT_FOUND | 訂單不存在或非本人所有 |
-| 409 | ORDER_PAID | 綠界回報目前編號已付款（訂單已標記 paid） |
+| 409 | ORDER_PAID | 綠界回報任一曾發出的編號已付款（訂單已標記 paid） |
 | 409 | PAYMENT_ATTEMPT_CONFLICT | 查詢期間訂單已被其他請求換號或已付款 |
-| 503 | ECPAY_UNAVAILABLE | 無法確認目前編號未付款（查詢失敗、逾時、驗證失敗、缺 TradeStatus 或其他代碼） |
+| 503 | ECPAY_UNAVAILABLE | 無法確認每個曾發出的編號皆未付款（查詢失敗、逾時、驗證失敗、缺 TradeStatus 或其他代碼） |
 
 ### POST /api/orders/:id/check-payment — 查詢綠界付款狀態
 
@@ -406,6 +406,7 @@
 | `verifyCheckMacValue(params, hashKey, hashIV)` | 時序安全驗證簽章（crypto.timingSafeEqual） |
 | `getMerchantTradeDate()` | 產生台灣時區日期字串（yyyy/MM/dd HH:mm:ss） |
 | `buildAioFormParams(order, items, config)` | 產生 ECPay AIO 表單參數（含 CheckMacValue），回傳 `{ action, fields }` |
+| `nextTradeNo(order)` | 下一次付款嘗試的編號（原始編號 + 兩位數序號）；已達 99 次回 `null` |
 | `queryIssuedTrades(order, config)` | 由新到舊對訂單曾發出的每個 MerchantTradeNo 呼叫 `queryTradeInfo`，遇到已付款即停；任一查詢 throw 即整體 throw。供付款嘗試與 `check-payment` 共用 |
 | `queryTradeInfo(merchantTradeNo, config)` | 呼叫 QueryTradeInfo API 查詢交易狀態；回應值未經 URL 編碼（`+`、`%` 原樣回傳，`&`、`=` 由綠界轉為空白），故以 `&`／首個 `=` 切分、不做解碼；回應 CheckMacValue 驗證失敗，或回應的 MerchantTradeNo 與查詢編號不符即 throw，呼叫端不會拿到未驗證的 TradeStatus |
 

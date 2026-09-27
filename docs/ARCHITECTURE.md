@@ -337,7 +337,7 @@ server.js
 | recipient_address | TEXT | NOT NULL | 收件地址 |
 | total_amount | INTEGER | NOT NULL | 訂單總金額 |
 | status | TEXT | NOT NULL DEFAULT 'pending', CHECK IN ('pending','paid','failed') | 訂單狀態 |
-| merchant_trade_no | TEXT | 可為 NULL | 最近一次付款嘗試的綠界交易編號（建立時為 order_no 去除連字號，如 `ORD20260412A1B2C`；每次前往付款改為加至少兩位數的遞增序號，如 `ORD20260412A1B2C01`）；標記已付款時改為實際付款的編號 |
+| merchant_trade_no | TEXT | 可為 NULL | 最近一次付款嘗試的綠界交易編號（建立時為 order_no 去除連字號，如 `ORD20260412A1B2C`；每次前往付款改為加兩位數遞增序號，如 `ORD20260412A1B2C01`，最多 99 次）；標記已付款時改為實際付款的編號 |
 | created_at | TEXT | NOT NULL DEFAULT datetime('now') | 建立時間 |
 
 ### order_items
