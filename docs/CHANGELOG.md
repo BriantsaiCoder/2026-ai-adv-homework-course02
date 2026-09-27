@@ -17,6 +17,7 @@
 ### Changed
 - 訂單金額計入運費：小計未滿 NT$ 500 加收 NT$ 150（`total_amount` 與綠界 `TotalAmount` 一致）
 - 結帳送出後改導向訂單確認頁 `/orders/:id`，由該頁前往綠界付款；自綠界返站後仍未付款即顯示「付款未完成」
+- `src/database.js` 支援 `DB_PATH` 環境變數覆寫資料庫路徑（未設定時維持 `database.sqlite`）；`vitest.config.js` 設 `DB_PATH=:memory:`，測試不再寫入開發用資料庫，修正重複執行耗盡種子商品庫存導致的連鎖失敗
 - 訂單詳情頁面（order-detail.ejs / order-detail.js）：原「付款成功/失敗」模擬按鈕改為「查詢付款狀態」與「前往付款」按鈕；從綠界導回時自動觸發付款狀態查詢
 
 ## [1.0.0] - 2026-04-12

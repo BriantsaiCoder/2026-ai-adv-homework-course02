@@ -287,7 +287,7 @@ server.js
 ## 資料庫 Schema
 
 引擎：SQLite3（better-sqlite3，同步 API）  
-檔案：`database.sqlite`（專案根目錄，自動建立）  
+檔案：`database.sqlite`（專案根目錄，自動建立；可用 `DB_PATH` 環境變數覆寫，測試固定為 `:memory:`）  
 模式：WAL（Write-Ahead Logging），啟用 foreign keys
 
 ### users
