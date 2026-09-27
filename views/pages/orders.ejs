@@ -1,40 +1,38 @@
-<div id="app">
-  <h1 class="text-2xl font-bold text-text-primary mb-6" style="font-family: 'Noto Serif TC', serif;">我的訂單</h1>
-
-  <div v-if="loading" class="flex justify-center py-12">
-    <div class="w-8 h-8 border-4 border-rose-primary border-t-transparent rounded-full animate-spin"></div>
+<div id="app" class="mx-auto w-full max-w-[1200px] px-5 pb-14 pt-7 lg:px-[120px] lg:pb-[120px] lg:pt-12">
+  <div class="flex items-end justify-between">
+    <h1 class="font-serif text-[30px] font-semibold text-stem lg:text-[40px]">我的訂單</h1>
+    <p v-if="orders.length" class="hidden text-[15px] text-ink-2 lg:block">共 {{ orders.length }} 筆</p>
   </div>
 
-  <div v-else-if="orders.length === 0" class="text-center py-12">
-    <div class="text-4xl mb-3">&#128230;</div>
-    <p class="text-text-secondary mb-1">尚無訂單</p>
-    <p class="text-text-muted text-sm mb-4">快去選購喜歡的花束吧！</p>
-    <a href="/" class="inline-block bg-rose-primary text-white px-6 py-2 rounded-full text-sm hover:bg-rose-dark transition-colors">去逛逛</a>
+  <div v-if="loading" class="flex justify-center py-24"><div class="spinner"></div></div>
+
+  <div v-else-if="orders.length === 0" class="py-20 text-center">
+    <p class="font-serif text-xl text-stem">還沒有訂單</p>
+    <p class="mt-2 text-sm text-ink-2">挑一束花，送給想念的人吧。</p>
+    <a href="/#products" class="btn-primary mt-6">瀏覽所有花禮</a>
   </div>
 
-  <div v-else class="space-y-4">
+  <div v-else class="mt-5 border-t border-line lg:mt-8">
+    <div class="hidden gap-6 border-b border-line py-3.5 text-[13px] text-ink-3 lg:flex">
+      <span class="flex-1">訂單編號</span><span class="w-[140px]">建立日期</span><span class="w-[140px]">金額</span><span class="w-[120px]">狀態</span><span class="w-5"></span>
+    </div>
     <a
       v-for="order in orders"
       :key="order.id"
       :href="'/orders/' + order.id"
-      class="block bg-white rounded-2xl shadow-sm p-5 hover:shadow-md transition-shadow"
+      class="flex items-center gap-3 border-b border-line py-[18px] transition-colors hover:bg-tissue/60 lg:gap-6 lg:py-6"
     >
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-sm text-text-secondary">訂單編號：{{ order.order_no }}</p>
-          <p class="text-xs text-text-muted mt-1">{{ new Date(order.created_at).toLocaleDateString('zh-TW') }}</p>
+      <div class="flex flex-1 flex-col gap-2 lg:contents">
+        <div class="flex items-center justify-between lg:contents">
+          <span class="font-num text-[15px] lg:flex-1 lg:text-base">{{ order.order_no }}</span>
+          <span class="lg:order-last lg:w-[120px]"><span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-medium" :class="(statusMap[order.status] || statusMap.unknown).cls"><span class="h-1.5 w-1.5 rounded-full bg-current"></span>{{ (statusMap[order.status] || statusMap.unknown).label }}</span></span>
         </div>
-        <div class="flex items-center gap-3">
-          <span class="font-bold text-text-primary">NT$ {{ order.total_amount.toLocaleString() }}</span>
-          <span
-            class="text-xs px-3 py-1 rounded-full font-medium"
-            :class="statusMap[order.status]?.cls || 'bg-gray-100 text-gray-600'"
-          >
-            {{ statusMap[order.status]?.label || order.status }}
-          </span>
-          <span class="text-text-muted">&#8594;</span>
+        <div class="flex justify-between lg:contents">
+          <span class="font-num text-sm text-ink-2 lg:w-[140px] lg:text-[15px]">{{ formatDate(order.created_at) }}</span>
+          <span class="font-num text-[15px] lg:w-[140px] lg:text-base">NT$ {{ order.total_amount.toLocaleString() }}</span>
         </div>
       </div>
+      <span class="text-ink-3 lg:order-last"><%- include('../partials/icon', { name: 'chevron-right' }) %></span>
     </a>
   </div>
 </div>

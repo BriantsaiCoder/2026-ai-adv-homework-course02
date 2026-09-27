@@ -10,11 +10,13 @@ createApp({
     const form = ref({ recipientName: '', recipientEmail: '', recipientAddress: '' });
     const errors = ref({});
 
+    const stepCurrent = 2;
     const cartTotal = computed(function () {
       return cartItems.value.reduce(function (sum, item) {
         return sum + item.product.price * item.quantity;
       }, 0);
     });
+    const shipping = computed(function () { return cartTotal.value >= 500 ? 0 : 150; });
 
     function validate() {
       errors.value = {};
@@ -36,8 +38,7 @@ createApp({
           method: 'POST',
           body: JSON.stringify(form.value)
         });
-        Notification.show('訂單已建立，正在前往付款...', 'success');
-        window.location.href = '/ecpay/payment/' + res.data.id;
+        window.location.href = '/orders/' + res.data.id;
       } catch (err) {
         Notification.show(err?.data?.message || '訂單建立失敗', 'error');
       } finally {
@@ -60,6 +61,6 @@ createApp({
       loading.value = false;
     });
 
-    return { loading, submitting, cartItems, form, errors, cartTotal, submitOrder };
+    return { loading, submitting, cartItems, form, errors, cartTotal, shipping, stepCurrent, submitOrder, sizedImage };
   }
 }).mount('#app');

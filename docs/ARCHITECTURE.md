@@ -49,10 +49,15 @@
 │   │       └── orders.ejs          # 後台訂單管理頁面
 │   └── partials/
 │       ├── head.ejs                # HTML head 區塊
-│       ├── header.ejs              # 前台導覽列
+│       ├── header.ejs              # 前台導覽列（含 mobile 漢堡選單）
+│       ├── front-footer.ejs        # 前台頁尾
+│       ├── icon.ejs                # inline Lucide SVG 圖示
+│       ├── product-card.ejs        # 商品卡（Vue 綁定）
+│       ├── checkout-steps.ejs      # 結帳步驟條（Vue 綁定 stepCurrent）
+│       ├── order-summary.ejs       # 訂單商品明細與收件資訊（Vue 綁定）
 │       ├── admin-header.ejs        # 後台導覽列
 │       ├── admin-sidebar.ejs       # 後台側邊欄
-│       ├── footer.ejs              # 頁尾
+│       ├── footer.ejs              # 後台頁尾
 │       └── notification.ejs        # 通知元件
 │
 ├── public/
