@@ -21,7 +21,7 @@
         <span class="hidden lg:inline font-num italic text-sm text-ink-3 pb-0.5">Flower Life</span>
       </a>
 
-      <% const ordersActive = typeof pageScript !== 'undefined' && ['orders', 'order-detail'].includes(pageScript); %>
+      <% const ordersActive = typeof pageScript !== 'undefined' && pageScript === 'orders'; %>
       <nav class="hidden lg:flex items-center gap-10 text-[15px]">
         <a href="/#products" class="<%= ordersActive ? 'text-ink-2' : 'text-ink' %> hover:text-rose transition-colors">所有花禮</a>
         <a href="/orders" class="<%= ordersActive ? 'text-ink font-medium' : 'text-ink-2' %> hover:text-rose transition-colors" <%- ordersActive ? 'aria-current="page"' : '' %>>我的訂單</a>
