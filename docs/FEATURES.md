@@ -13,7 +13,7 @@
 | 後台訂單管理 | ✅ 完成 | 訂單查詢與狀態篩選 |
 | 前台頁面 | ✅ 完成 | EJS + Tailwind CSS |
 | 後台頁面 | ✅ 完成 | EJS + Tailwind CSS |
-| 測試 | ✅ 完成 | Vitest + supertest，6 個測試檔案 |
+| 測試 | ✅ 完成 | Vitest + supertest，7 個測試檔案 |
 | API 文件 | ✅ 完成 | Swagger/OpenAPI 生成 |
 
 ---
@@ -322,6 +322,9 @@
 - 從 DB 讀取訂單與品項資訊
 - 訂單不存在 → 404
 - 訂單狀態非 pending → 302 重導至訂單詳情頁
+- 每次付款嘗試產生新的 MerchantTradeNo（綠界拒收重複編號，錯誤代碼 10300028「訂單編號重覆」）：order_no 去除連字號 + 兩位數遞增序號（`ORD20260412A1B2C01`、`…02`…，上限 20 字元，超過 → 400），並寫回訂單 `merchant_trade_no`
+- 前一次嘗試已送綠界時，換號前先以 QueryTradeInfo 查詢前一編號：已付款（TradeStatus `1`）→ 更新訂單為 `paid` 並 302 至訂單詳情頁，避免重複扣款；查詢失敗 → 302 至 `/orders/:orderId?payment=pending`
+- 回應帶 `Cache-Control: no-store`，使用者從綠界按上一頁時會重新取號，而非重送舊表單
 - 產生 ECPay 所需參數：MerchantID、MerchantTradeNo、MerchantTradeDate（台灣時區）、TotalAmount、ItemName（商品名稱以 `#` 連接，上限 400 bytes）等
 - 計算 CheckMacValue（SHA256，ECPay 專用 URL 編碼）
 - 設定 ClientBackURL 為 `/orders/:orderId?payment=pending`（付款後瀏覽器導回）
@@ -333,7 +336,7 @@
 | 參數 | 值 | 說明 |
 |------|------|------|
 | MerchantID | 環境變數 `ECPAY_MERCHANT_ID` | 測試：3002607 |
-| MerchantTradeNo | 訂單的 `merchant_trade_no` | 由 order_no 去除連字號產生，最多 20 字元 |
+| MerchantTradeNo | 本次付款嘗試的編號 | order_no 去除連字號 + 兩位數遞增序號，最多 20 字元 |
 | PaymentType | `aio` | 固定值 |
 | ChoosePayment | `ALL` | 顯示所有付款方式 |
 | EncryptType | `1` | SHA256 |
@@ -348,7 +351,7 @@
 1. 查詢訂單（驗證 user_id 與訂單存在）
 2. 訂單已非 pending → 直接回傳現有狀態
 3. 訂單無 `merchant_trade_no` → 400
-4. 呼叫綠界 `POST /Cashier/QueryTradeInfo/V5`（TimeStamp 每次重新產生，有效期 3 分鐘）
+4. 以訂單目前的 `merchant_trade_no`（最近一次付款嘗試）呼叫綠界 `POST /Cashier/QueryTradeInfo/V5`（TimeStamp 每次重新產生，有效期 3 分鐘）
 5. 驗證回應中的 CheckMacValue
 6. `TradeStatus === '1'` → 更新訂單狀態為 `paid`，回傳成功
 7. 其他 TradeStatus → 回傳「尚未完成付款」

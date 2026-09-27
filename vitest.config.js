@@ -10,6 +10,7 @@ export default defineConfig({
         'tests/products.test.js',
         'tests/cart.test.js',
         'tests/orders.test.js',
+        'tests/ecpayPayment.test.js',
         'tests/adminProducts.test.js',
         'tests/adminOrders.test.js',
       ],

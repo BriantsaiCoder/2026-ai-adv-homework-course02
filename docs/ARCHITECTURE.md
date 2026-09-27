@@ -83,6 +83,7 @@
     ├── products.test.js            # 商品 API 測試
     ├── cart.test.js                # 購物車 API 測試
     ├── orders.test.js              # 訂單 API 測試
+    ├── ecpayPayment.test.js        # 綠界付款嘗試換號測試
     ├── adminProducts.test.js       # 後台商品 API 測試
     └── adminOrders.test.js         # 後台訂單 API 測試
 ```
@@ -331,7 +332,7 @@ server.js
 | recipient_address | TEXT | NOT NULL | 收件地址 |
 | total_amount | INTEGER | NOT NULL | 訂單總金額 |
 | status | TEXT | NOT NULL DEFAULT 'pending', CHECK IN ('pending','paid','failed') | 訂單狀態 |
-| merchant_trade_no | TEXT | 可為 NULL | 綠界交易編號（由 order_no 去除連字號產生，如 `ORD20260412A1B2C`） |
+| merchant_trade_no | TEXT | 可為 NULL | 最近一次付款嘗試的綠界交易編號（建立時為 order_no 去除連字號，如 `ORD20260412A1B2C`；每次前往付款改為加兩位數遞增序號，如 `ORD20260412A1B2C01`） |
 | created_at | TEXT | NOT NULL DEFAULT datetime('now') | 建立時間 |
 
 ### order_items
@@ -378,6 +379,8 @@ server.js
 用戶結帳 → POST /api/orders（建立訂單，含 merchant_trade_no）
   │
   ├─ 前端導向 GET /ecpay/payment/:orderId
+  │    └─ 前次嘗試已送綠界 → QueryTradeInfo 確認未付款（已付款則標記 paid 並導回訂單頁）
+  │    └─ 產生本次嘗試的 MerchantTradeNo（order_no 去連字號 + 遞增序號）並寫回訂單
   │    └─ Server 產生 ECPay AIO 參數（MerchantTradeNo, TotalAmount, ItemName 等）
   │    └─ 計算 CheckMacValue（SHA256，ECPay 專用 URL 編碼）
   │    └─ 回傳自動送出 HTML 表單 → 瀏覽器 POST 至綠界
