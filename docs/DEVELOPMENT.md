@@ -95,7 +95,7 @@ router.get('/profile', authMiddleware, (req, res) => { ... });
 ```
 
 6. **撰寫測試**：在 `tests/` 下新增對應測試檔案
-7. **準備測試資料**：各測試檔 DB 獨立（`DB_PATH=:memory:`），前置資料在同檔 `beforeAll` 建立；Vitest 自動收集新測試檔，無需登錄 `sequence.files`
+7. **準備測試資料**：各測試檔有獨立的 `:memory:` DB（`DB_PATH=:memory:`），前置資料在同檔 `beforeAll` 建立；Vitest 自動收集新測試檔，無需登錄
 
 ## 新增 Middleware 步驟
 
@@ -148,7 +148,7 @@ CREATE TABLE IF NOT EXISTS your_table (
 | `PORT` | 伺服器監聽埠號 | 選填 | `3001` |
 | `BASE_URL` | 伺服器基礎 URL | 選填 | `http://localhost:3001` |
 | `FRONTEND_URL` | CORS 允許來源 | 選填 | `http://localhost:3001`（app.js fallback） |
-| `DB_PATH` | SQLite 資料庫路徑 | 選填 | 專案根目錄 `database.sqlite`（測試由 `vitest.config.js` 設為 `:memory:`） |
+| `DB_PATH` | SQLite 資料庫路徑 | 選填 | 專案根目錄 `database.sqlite`（測試由 `vitest.config.js` 設為 `:memory:`）；值原樣傳給 better-sqlite3，相對路徑以啟動時的 process cwd 為基準（非專案根目錄），建議用絕對路徑 |
 | `ADMIN_EMAIL` | 種子管理員信箱 | 選填 | `admin@hexschool.com` |
 | `ADMIN_PASSWORD` | 種子管理員密碼 | 選填 | `12345678` |
 | `NODE_ENV` | 執行環境 | 選填 | 無（影響 bcrypt salt rounds：`test` → 1，其他 → 10） |
