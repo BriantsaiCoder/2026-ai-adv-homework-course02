@@ -1,0 +1,24 @@
+<%# Vue-bound checkout progress; expects `stepCurrent` (1-4, or 5 when every step is done). %>
+<nav aria-label="結帳步驟" class="<%= typeof cls !== 'undefined' ? cls : '' %>">
+  <div class="flex items-center gap-1.5 lg:gap-3">
+    <template v-for="(label, i) in ['購物車', '填寫資料', '綠界付款', '完成']" :key="label">
+      <span v-if="i > 0" aria-hidden="true" class="h-px flex-1" :class="i < stepCurrent ? 'bg-stem' : 'bg-line'"></span>
+      <span class="flex items-center gap-2" :aria-current="i + 1 === stepCurrent ? 'step' : null">
+        <span
+          class="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border font-num text-[13px]"
+          :class="i + 1 < stepCurrent ? 'border-stem bg-stem text-white' : i + 1 === stepCurrent ? 'border-rose bg-rose text-white' : 'border-line text-ink-3'"
+        >
+          <span v-if="i + 1 < stepCurrent" class="contents"><%- include('icon', { name: 'check', cls: 'w-3.5 h-3.5', stroke: 2.5 }) %></span>
+          <span v-else>{{ i + 1 }}</span>
+        </span>
+        <span
+          class="whitespace-nowrap text-[13px] lg:inline lg:text-sm"
+          :class="[
+            i + 1 === stepCurrent || (stepCurrent > 4 && i === 3) ? 'font-medium' : 'hidden',
+            i + 1 <= stepCurrent ? 'text-ink' : 'text-ink-3'
+          ]"
+        >{{ label }}</span>
+      </span>
+    </template>
+  </div>
+</nav>

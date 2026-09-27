@@ -1,78 +1,92 @@
 <div id="app" data-product-id="<%= productId %>">
-  <div v-if="loading" class="flex justify-center py-12">
-    <div class="w-8 h-8 border-4 border-rose-primary border-t-transparent rounded-full animate-spin"></div>
+  <div v-if="loading" class="flex justify-center py-24"><div class="spinner"></div></div>
+
+  <div v-else-if="notFound" class="container-page py-24 text-center">
+    <h1 class="font-serif text-2xl font-semibold text-stem">找不到此商品</h1>
+    <p class="mt-2 text-ink-2">商品可能已下架，看看其他花禮吧。</p>
+    <a href="/#products" class="btn-primary mt-6">瀏覽所有花禮</a>
   </div>
 
-  <div v-else-if="notFound" class="text-center py-16">
-    <div class="text-5xl mb-4">&#127804;</div>
-    <h2 class="text-xl font-medium text-text-primary mb-2">找不到此商品</h2>
-    <a href="/" class="text-rose-primary hover:text-rose-dark text-sm">回到首頁</a>
-  </div>
+  <template v-else-if="product">
+    <nav class="container-page hidden items-center gap-2.5 pt-7 text-sm lg:flex" aria-label="麵包屑">
+      <a href="/#products" class="text-ink-2 hover:text-rose">所有花禮</a>
+      <span class="text-ink-3"><%- include('../partials/icon', { name: 'chevron-right', cls: 'w-3.5 h-3.5' }) %></span>
+      <span>{{ product.name }}</span>
+    </nav>
 
-  <div v-else-if="product" class="flex flex-col md:flex-row gap-8 md:gap-12">
-    <!-- Left: Image -->
-    <div class="md:w-1/2">
-      <div class="rounded-2xl overflow-hidden shadow-sm">
-        <img
-          :src="product.image_url || 'https://images.unsplash.com/photo-1490750967868-88aa4f44baee?w=600'"
-          :alt="product.name"
-          class="w-full aspect-square object-cover"
-        />
-      </div>
-    </div>
+    <section class="lg:mx-auto lg:flex lg:max-w-[1200px] lg:gap-20 lg:px-8 lg:pb-24 lg:pt-7">
+      <img :src="sizedImage(product.image_url, 1200)" :alt="product.name" class="h-[460px] w-full object-cover lg:h-[760px] lg:w-[53%] lg:shrink-0 lg:rounded" />
 
-    <!-- Right: Info -->
-    <div class="md:w-1/2">
-      <h1 class="text-2xl md:text-3xl font-bold text-text-primary mb-2" style="font-family: 'Noto Serif TC', serif;">
-        {{ product.name }}
-      </h1>
-      <p class="text-3xl text-rose-primary font-bold mb-4">NT$ {{ product.price.toLocaleString() }}</p>
+      <div class="flex flex-col gap-[22px] px-5 pb-9 pt-6 lg:flex-1 lg:gap-7 lg:px-0 lg:pb-0 lg:pt-4">
+        <nav class="flex items-center gap-2 text-[13px] lg:hidden" aria-label="麵包屑">
+          <a href="/#products" class="text-ink-2">所有花禮</a>
+          <span class="text-ink-3"><%- include('../partials/icon', { name: 'chevron-right', cls: 'w-3 h-3' }) %></span>
+          <span>{{ product.name }}</span>
+        </nav>
 
-      <div class="mb-6">
-        <span class="text-sage text-sm">&#10003; 尚有 {{ product.stock }} 件</span>
-      </div>
+        <div class="flex flex-col gap-2.5 lg:gap-3.5">
+          <h1 class="font-serif text-[28px] font-semibold text-stem lg:text-[40px]">{{ product.name }}</h1>
+          <p class="font-num text-[26px] lg:text-[32px]">NT$ {{ product.price.toLocaleString() }}</p>
+          <p v-if="product.stock > 0" class="flex items-center gap-1.5 text-[13px] text-sage-ink lg:gap-2 lg:text-sm">
+            <%- include('../partials/icon', { name: 'circle-check', cls: 'w-4 h-4 lg:w-[18px] lg:h-[18px]' }) %>現貨 {{ product.stock }} 件
+          </p>
+          <p v-else class="text-sm text-ink-3">已售完</p>
+        </div>
 
-      <p class="text-text-secondary leading-relaxed mb-6">{{ product.description }}</p>
+        <p class="text-[15px] leading-[1.85] text-ink-2 lg:text-base lg:leading-[1.9]">{{ product.description }}</p>
 
-      <!-- Quantity Selector -->
-      <div class="flex items-center gap-4 mb-6">
-        <span class="text-sm text-text-secondary">數量</span>
-        <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden">
-          <button
-            @click="decrease"
-            class="w-10 h-10 flex items-center justify-center hover:bg-gray-50 text-text-secondary transition-colors"
-          >
-            -
-          </button>
-          <span class="w-12 h-10 flex items-center justify-center text-sm border-x border-gray-200">
-            {{ quantity }}
-          </span>
-          <button
-            @click="increase"
-            class="w-10 h-10 flex items-center justify-center hover:bg-gray-50 text-text-secondary transition-colors"
-          >
-            +
-          </button>
+        <div class="flex items-center justify-between border-y border-line py-[18px] lg:hidden">
+          <span class="text-sm font-medium">數量</span>
+          <div class="qty">
+            <button @click="decrease" :disabled="quantity <= 1" aria-label="減少數量"><%- include('../partials/icon', { name: 'minus', cls: 'w-[18px] h-[18px]' }) %></button>
+            <span>{{ quantity }}</span>
+            <button @click="increase" :disabled="quantity >= product.stock" aria-label="增加數量"><%- include('../partials/icon', { name: 'plus', cls: 'w-[18px] h-[18px]' }) %></button>
+          </div>
+        </div>
+
+        <div class="hidden flex-col gap-3 border-t border-line pt-6 lg:flex">
+          <span class="text-sm font-medium">數量</span>
+          <div class="flex gap-3.5">
+            <div class="qty h-[52px]">
+              <button @click="decrease" :disabled="quantity <= 1" aria-label="減少數量"><%- include('../partials/icon', { name: 'minus', cls: 'w-[18px] h-[18px]' }) %></button>
+              <span>{{ quantity }}</span>
+              <button @click="increase" :disabled="quantity >= product.stock" aria-label="增加數量"><%- include('../partials/icon', { name: 'plus', cls: 'w-[18px] h-[18px]' }) %></button>
+            </div>
+            <button @click="addMain" :disabled="adding || product.stock <= 0" class="btn-primary h-[52px] flex-1 py-0">
+              <template v-if="product.stock > 0">加入購物車<span class="ml-2 font-num">NT$ {{ (product.price * quantity).toLocaleString() }}</span></template>
+              <template v-else>已售完</template>
+            </button>
+          </div>
+        </div>
+
+        <div class="rounded-md bg-tissue p-5 lg:px-7 lg:py-6">
+          <h2 class="text-sm font-medium lg:text-[15px]">購買須知</h2>
+          <ul class="mt-3 flex flex-col gap-3 text-[13px] text-ink-2 lg:mt-4 lg:gap-4 lg:text-sm">
+            <li class="flex items-center gap-2.5 lg:gap-3"><span class="text-rose"><%- include('../partials/icon', { name: 'truck', cls: 'w-4 h-4 lg:w-[18px] lg:h-[18px]' }) %></span>台北市區可享當日配送服務</li>
+            <li class="flex items-center gap-2.5 lg:gap-3"><span class="text-rose"><%- include('../partials/icon', { name: 'badge-percent', cls: 'w-4 h-4 lg:w-[18px] lg:h-[18px]' }) %></span>消費滿 NT$ 500 享免運，未滿酌收 NT$ 150</li>
+            <li class="flex items-center gap-2.5 lg:gap-3"><span class="text-rose"><%- include('../partials/icon', { name: 'leaf', cls: 'w-4 h-4 lg:w-[18px] lg:h-[18px]' }) %></span>花材依季節供應，實際花束可能略有差異</li>
+          </ul>
         </div>
       </div>
+    </section>
 
-      <button
-        @click="addToCart"
-        :disabled="adding || product.stock <= 0"
-        class="w-full bg-rose-primary text-white py-3 rounded-full text-sm font-medium hover:bg-rose-dark transition-colors disabled:opacity-50"
-      >
-        {{ product.stock <= 0 ? '已售完' : '加入購物車' }}
-      </button>
-
-      <!-- Purchase Notes -->
-      <div class="mt-8 bg-blush rounded-xl p-5">
-        <h3 class="font-medium text-text-primary mb-2 text-sm">購買須知</h3>
-        <ul class="text-text-muted text-xs space-y-1.5">
-          <li>- 花材依據季節供應，實際花束可能略有差異</li>
-          <li>- 台北市區可享當日配送服務</li>
-          <li>- 消費滿 NT$ 500 享免運優惠</li>
-        </ul>
+    <section v-if="related.length" class="border-t border-line">
+      <div class="container-page pb-10 pt-9 lg:pb-24 lg:pt-[72px]">
+        <h2 class="font-serif text-[22px] font-semibold text-stem lg:text-[30px]">你可能也喜歡</h2>
+        <div class="mt-5 grid grid-cols-2 gap-4 lg:mt-8 lg:grid-cols-4 lg:gap-6">
+          <div v-for="(p, i) in related" :key="p.id" :class="{ 'hidden lg:block': i >= 2 }">
+            <%- include('../partials/product-card') %>
+          </div>
+        </div>
       </div>
+    </section>
+
+    <div data-sticky-bar class="fixed inset-x-0 bottom-0 z-40 flex items-center gap-3.5 border-t border-line bg-white px-5 pb-6 pt-3 shadow-[0_-4px_16px_rgba(34,56,46,0.08)] lg:hidden">
+      <div>
+        <p class="text-xs text-ink-3">小計</p>
+        <p class="font-num text-xl">NT$ {{ (product.price * quantity).toLocaleString() }}</p>
+      </div>
+      <button @click="addMain" :disabled="adding || product.stock <= 0" class="btn-primary flex-1">{{ product.stock <= 0 ? '已售完' : '加入購物車' }}</button>
     </div>
-  </div>
+  </template>
 </div>

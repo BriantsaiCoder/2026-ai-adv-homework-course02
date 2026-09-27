@@ -11,7 +11,7 @@
 | 綠界金流串接 | ✅ 完成 | ECPay AIO 付款、QueryTradeInfo 查詢驗證 |
 | 後台商品管理 | ✅ 完成 | 商品 CRUD |
 | 後台訂單管理 | ✅ 完成 | 訂單查詢與狀態篩選 |
-| 前台頁面 | ✅ 完成 | EJS + Tailwind CSS |
+| 前台頁面 | ✅ 完成 | EJS + Tailwind CSS；依 `docs/design/` 設計稿改版，響應式（mobile 單欄、≥1024px 雙欄） |
 | 後台頁面 | ✅ 完成 | EJS + Tailwind CSS |
 | 測試 | ✅ 完成 | Vitest + supertest，6 個測試檔案 |
 | API 文件 | ✅ 完成 | Swagger/OpenAPI 生成 |
@@ -253,7 +253,7 @@
 3. 從 `cart_items JOIN products` 取得購物車品項（僅查 `user_id`，不含 session）
 4. 購物車為空 → 400 CART_EMPTY
 5. 逐品項檢查庫存，不足者收集名稱 → 400「以下商品庫存不足：名稱1, 名稱2」
-6. 計算 `totalAmount = Σ(price × quantity)`
+6. 計算 `totalAmount = 小計 + 運費`，小計為 `Σ(price × quantity)`；小計未滿 NT$ 500 加收運費 NT$ 150，滿額免運（`total_amount` 即綠界 `TotalAmount`）
 7. 生成 `orderNo = ORD-YYYYMMDD-{5碼UUID大寫}`
 8. **Transaction**：INSERT order → INSERT order_items（快照名稱+價格） → UPDATE stock → DELETE cart_items
 9. 回傳 201 + 訂單詳情
@@ -320,7 +320,8 @@
 
 ```
 結帳送出訂單 → POST /api/orders 建立訂單（含 merchant_trade_no）
-  → 前端導向 GET /ecpay/payment/:orderId
+  → 前端導向 /orders/:orderId（訂單確認頁）→ 使用者點「前往綠界付款」
+  → GET /ecpay/payment/:orderId
   → Server 產生 ECPay 參數 + CheckMacValue → 回傳自動送出 HTML 表單
   → 瀏覽器 POST 至綠界付款頁 → 使用者完成付款
   → 綠界透過 ClientBackURL 導回 /orders/:orderId?payment=pending

@@ -1,4 +1,66 @@
-const { app, request, registerUser } = require('./setup');
+const { app, request, getAdminToken, registerUser } = require('./setup');
+
+const orderBody = {
+  recipientName: '測試收件人',
+  recipientEmail: 'recipient@example.com',
+  recipientAddress: '台北市測試路 123 號',
+};
+
+async function orderWith(token, productId, quantity) {
+  await request(app)
+    .post('/api/cart')
+    .set('Authorization', `Bearer ${token}`)
+    .send({ productId, quantity });
+  return request(app)
+    .post('/api/orders')
+    .set('Authorization', `Bearer ${token}`)
+    .send(orderBody);
+}
+
+describe('Orders API - shipping fee', () => {
+  let userToken;
+  let adminToken;
+  let cheapProductId;
+  const orderIds = [];
+
+  beforeAll(async () => {
+    ({ token: userToken } = await registerUser());
+    adminToken = await getAdminToken();
+    const res = await request(app)
+      .post('/api/admin/products')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: '運費測試商品', price: 250, stock: 10 });
+    cheapProductId = res.body.data.id;
+  });
+
+  afterAll(async () => {
+    for (const id of orderIds) {
+      await request(app)
+        .patch(`/api/orders/${id}/pay`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send({ action: 'success' });
+    }
+    await request(app)
+      .delete(`/api/admin/products/${cheapProductId}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+  });
+
+  it('should add NT$ 150 shipping when subtotal is under NT$ 500', async () => {
+    const res = await orderWith(userToken, cheapProductId, 1);
+
+    expect(res.status).toBe(201);
+    orderIds.push(res.body.data.id);
+    expect(res.body.data.total_amount).toBe(250 + 150);
+  });
+
+  it('should waive shipping when subtotal is exactly NT$ 500', async () => {
+    const res = await orderWith(userToken, cheapProductId, 2);
+
+    expect(res.status).toBe(201);
+    orderIds.push(res.body.data.id);
+    expect(res.body.data.total_amount).toBe(500);
+  });
+});
 
 describe('Orders API', () => {
   let userToken;

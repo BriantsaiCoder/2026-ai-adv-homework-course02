@@ -12,6 +12,8 @@ createApp({
         return sum + item.product.price * item.quantity;
       }, 0);
     });
+    const shipping = computed(function () { return shippingFee(total.value); });
+    const freeShipping = computed(function () { return shipping.value === 0; });
 
     async function loadCart() {
       loading.value = true;
@@ -50,6 +52,7 @@ createApp({
         await apiFetch('/api/cart/' + deleteItemId.value, { method: 'DELETE' });
         items.value = items.value.filter(function (i) { return i.id !== deleteItemId.value; });
         Notification.show('已從購物車移除', 'success');
+        refreshCartBadge();
       } catch (e) {
         Notification.show('移除失敗', 'error');
       }
@@ -68,8 +71,8 @@ createApp({
     });
 
     return {
-      items, loading, total, confirmVisible,
-      updateQuantity, confirmDelete, handleDelete, goCheckout
+      items, loading, total, shipping, freeShipping, FREE_SHIPPING_THRESHOLD, confirmVisible,
+      updateQuantity, confirmDelete, handleDelete, goCheckout, sizedImage
     };
   }
 }).mount('#app');

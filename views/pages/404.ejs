@@ -1,8 +1,16 @@
-<div class="min-h-[60vh] flex items-center justify-center">
-  <div class="text-center">
-    <div class="text-6xl mb-4">&#127804;</div>
-    <h1 class="text-2xl font-bold text-text-primary mb-2" style="font-family: 'Noto Serif TC', serif;">找不到頁面</h1>
-    <p class="text-text-secondary mb-6">您造訪的頁面不存在</p>
-    <a href="/" class="inline-block bg-rose-primary text-white px-6 py-2 rounded-full text-sm hover:bg-rose-dark transition-colors">回到首頁</a>
+<div class="container-page flex flex-col gap-[18px] pb-14 pt-6 lg:flex-row lg:items-center lg:gap-24 lg:pb-[120px] lg:pt-20">
+  <img
+    src="https://images.unsplash.com/photo-1572843964740-7f3093aaf0a5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080"
+    alt="插在玻璃瓶裡的乾燥花"
+    class="h-[300px] w-full rounded object-cover lg:h-[600px] lg:w-[43%] lg:shrink-0"
+  />
+  <div class="flex flex-col gap-[18px] lg:flex-1 lg:gap-[22px]">
+    <p class="font-num text-[64px] leading-none text-petal lg:text-[96px]">404</p>
+    <h1 class="font-serif text-[28px] font-semibold text-stem lg:text-[40px]">這一頁找不到了</h1>
+    <p class="max-w-[440px] text-[15px] leading-[1.8] text-ink-2 lg:text-base">你要找的頁面可能已經移除，或網址有誤。<span class="hidden lg:inline">回到首頁，看看這季的花吧。</span></p>
+    <div class="flex flex-col gap-3.5 pt-2 lg:flex-row">
+      <a href="/" class="btn-primary">回到首頁</a>
+      <a href="/orders" class="btn-secondary hidden lg:inline-flex">查看我的訂單</a>
+    </div>
   </div>
 </div>

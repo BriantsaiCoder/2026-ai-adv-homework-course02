@@ -12,10 +12,97 @@
   --color-text-primary: #2C2A28;
   --color-text-secondary: #6B6560;
   --color-text-muted: #9A948E;
+
+  /* Storefront redesign (docs/design) */
+  --color-stem: #22382E;
+  --color-stem-soft: #3E5A4C;
+  --color-rose: #A85B67;
+  --color-rose-deep: #8E4653;
+  --color-petal: #C4727F;
+  --color-tissue: #F7EEEA;
+  --color-kraft: #C9A882;
+  --color-kraft-soft: #EFE4D6;
+  --color-card: #FFFDF9;
+  --color-sage-ink: #4F7A5A;
+  --color-sage-bg: #E6EFE7;
+  --color-apricot-ink: #A8612F;
+  --color-apricot-bg: #F8EADC;
+  --color-error: #B3261E;
+  --color-error-bg: #FBE9E7;
+  --color-ink: #22382E;
+  --color-ink-2: #5F625C;
+  --color-ink-3: #8C8E88;
+  --color-line: #E7E0DA;
+
+  --font-sans: 'Noto Sans TC', sans-serif;
+  --font-serif: 'Noto Serif TC', serif;
+  --font-num: 'Fraunces', 'Noto Serif TC', serif;
+  --font-hand: 'LXGW WenKai TC', 'Noto Serif TC', serif;
 }
 
-body {
-  font-family: 'Noto Sans TC', sans-serif;
-  background-color: var(--color-cream);
-  color: var(--color-text-primary);
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--color-cream);
+    color: var(--color-text-primary);
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+  /* Reserve room under the footer for the mobile fixed buy/checkout bar. */
+  @media (width < 64rem) {
+    body:has([data-sticky-bar]) {
+      padding-bottom: 88px;
+    }
+  }
+}
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-[1200px] px-5 md:px-8;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-md bg-rose px-8 py-[15px] text-[15px] font-medium text-white transition-colors hover:bg-rose-deep disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-md border border-stem px-8 py-[14px] text-[15px] font-medium text-stem transition-colors hover:bg-stem hover:text-white disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary,
+  .btn-secondary,
+  .field-input {
+    @apply focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stem;
+  }
+
+  .field-label {
+    @apply mb-2 block text-sm font-medium text-ink;
+  }
+
+  .field-input {
+    @apply h-12 w-full rounded-md border border-line bg-white px-3.5 text-[15px] text-ink transition-colors placeholder:text-ink-3 focus:border-stem focus:outline-none;
+  }
+
+  .field-error {
+    @apply mt-1.5 text-xs text-error;
+  }
+
+  .qty {
+    @apply inline-flex h-11 items-center rounded-md border border-line;
+  }
+
+  .qty > button {
+    @apply flex h-full w-11 items-center justify-center text-ink-2 transition-colors hover:text-stem disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .qty > span {
+    @apply w-12 text-center font-num text-base;
+  }
+
+  .spinner {
+    @apply h-8 w-8 animate-spin rounded-full border-4 border-rose border-t-transparent;
+  }
 }

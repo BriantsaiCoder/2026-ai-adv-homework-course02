@@ -1,0 +1,18 @@
+<%# Vue-bound product card; expects `p` in scope plus `sizedImage` and `addToCart` from the page app. %>
+<div class="flex flex-col gap-2.5 lg:gap-3.5">
+  <a :href="'/products/' + p.id" class="block aspect-[4/5] overflow-hidden rounded bg-tissue">
+    <img :src="sizedImage(p.image_url, 600)" :alt="p.name" loading="lazy" class="h-full w-full object-cover" />
+  </a>
+  <a :href="'/products/' + p.id" class="block">
+    <h3 class="truncate text-[15px] font-medium lg:text-base">{{ p.name }}</h3>
+    <p class="mt-1 font-num text-[15px] text-ink-2 lg:text-[17px]">NT$ {{ p.price.toLocaleString() }}</p>
+  </a>
+  <button
+    @click="addToCart(p)"
+    :disabled="p._adding || p.stock <= 0"
+    class="flex h-[38px] items-center justify-center gap-1.5 rounded-md border border-line text-[13px] text-stem transition-colors hover:border-stem disabled:cursor-not-allowed disabled:border-[#F3F1EE] disabled:bg-[#F3F1EE] disabled:text-ink-3 lg:h-[42px] lg:text-sm"
+  >
+    <span v-if="p.stock > 0" class="contents"><%- include('icon', { name: 'plus', cls: 'w-4 h-4' }) %></span>
+    {{ p.stock <= 0 ? '已售完' : '加入購物車' }}
+  </button>
+</div>

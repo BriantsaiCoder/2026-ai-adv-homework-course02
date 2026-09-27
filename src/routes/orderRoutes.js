@@ -8,6 +8,9 @@ const router = express.Router();
 
 router.use(authMiddleware);
 
+const FREE_SHIPPING_THRESHOLD = 500;
+const SHIPPING_FEE = 150;
+
 function generateOrderNo() {
   const now = new Date();
   const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
@@ -55,6 +58,7 @@ function generateOrderNo() {
  *                       type: string
  *                     total_amount:
  *                       type: integer
+ *                       description: 小計 + 運費（小計未滿 500 加收 150）
  *                     status:
  *                       type: string
  *                     items:
@@ -127,10 +131,11 @@ router.post('/', (req, res) => {
     });
   }
 
-  // Calculate total
-  const totalAmount = cartItems.reduce(
+  // Calculate total (subtotal + shipping; front-end cart/checkout use the same rule)
+  const subtotal = cartItems.reduce(
     (sum, item) => sum + item.product_price * item.quantity, 0
   );
+  const totalAmount = subtotal + (subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE);
 
   const orderId = uuidv4();
   const orderNo = generateOrderNo();
@@ -209,6 +214,7 @@ router.post('/', (req, res) => {
  *                             type: string
  *                           total_amount:
  *                             type: integer
+ *                             description: 小計 + 運費（小計未滿 500 加收 150）
  *                           status:
  *                             type: string
  *                           created_at:
@@ -268,6 +274,7 @@ router.get('/', (req, res) => {
  *                       type: string
  *                     total_amount:
  *                       type: integer
+ *                       description: 小計 + 運費（小計未滿 500 加收 150）
  *                     status:
  *                       type: string
  *                     created_at:
@@ -353,6 +360,7 @@ router.get('/:id', (req, res) => {
  *                       type: string
  *                     total_amount:
  *                       type: integer
+ *                       description: 小計 + 運費（小計未滿 500 加收 150）
  *                     status:
  *                       type: string
  *                     created_at:
