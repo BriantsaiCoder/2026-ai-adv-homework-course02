@@ -19,7 +19,7 @@ description: 以 Playwright MCP 對本專案（花漾生活，localhost:3001）�
 
 1. `lsof -nP -iTCP:3001 -sTCP:LISTEN`；已有 listener 時先確認它跑的是本 repo 的現行程式碼，再沿用，並 `curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/` 確認 200：
    - `lsof -a -p <pid> -d cwd -Fn` 的 cwd 須為本 repo root，否則是別的專案，停止並回報。
-   - `ps -o lstart= -p <pid>` 的啟動時間須晚於 `find src views public/js -type f -print0 | xargs -0 stat -f '%Sm %N' -t '%Y-%m-%d %H:%M:%S' | sort | tail -1` 的最後修改時間；較舊表示跑的是舊程式碼（Node 不會 hot reload），回報並徵得使用者同意後再重啟，不要驗舊程式碼得出假 PASS。Claude Code sandbox 內 `ps` 會被擋（`operation not permitted`），這是唯讀指令，改在 sandbox 外執行。
+   - `ps -o lstart= -p <pid>` 的啟動時間須晚於 `find app.js server.js src views public/js -type f -print0 | xargs -0 stat -f '%Sm %N' -t '%Y-%m-%d %H:%M:%S' | sort | tail -1` 的最後修改時間；較舊表示跑的是舊程式碼（Node 不會 hot reload），回報並徵得使用者同意後再重啟，不要驗舊程式碼得出假 PASS。Claude Code sandbox 內 `ps` 會被擋（`operation not permitted`），這是唯讀指令，改在 sandbox 外執行。
 2. 沒有就 `npm run css:build`，再背景執行 `node server.js`，看到 `Server running on port 3001` 才繼續。
    - 若報 `Fatal: JWT_SECRET is not set`：`server.js` 靠 dotenv 讀 `.env`，Claude Code 的 Bash sandbox 禁讀 `.env*`。改在 sandbox 外背景啟動（`dangerouslyDisableSandbox: true` + `run_in_background`）。不要讀、印或寫死 `.env` 內容。
 3. 記下 server 是否由本次啟動，收尾時回報。
@@ -29,7 +29,7 @@ description: 以 Playwright MCP 對本專案（花漾生活，localhost:3001）�
 1. 帳密用 `admin@hexschool.com`／`12345678`，即 `src/database.js` `seedAdminUser()` 的預設值；使用者另給則用使用者的。若 `.env` 以 `ADMIN_EMAIL`／`ADMIN_PASSWORD` 覆寫導致登入失敗，向使用者索取，不要讀 `.env`。
 2. `browser_navigate` → `http://localhost:3001/login`，以 `browser_evaluate` 執行 `() => localStorage.getItem('flower_token') !== null`，只回傳布林值；不要回傳 token 本身，否則 JWT 明文會進到對話紀錄。為 `true` 表示殘留前次登入，執行 `localStorage.clear()` 後重新整理，讓登入步驟真的被驗到。
 3. 填 textbox「Email」「密碼」，按 button「登入」。
-4. 成功條件：導回 `/`，header 出現 button「登出」。截 `01-logged-in.png`。
+4. 成功條件：導回 `/`，且 `browser_evaluate` 執行 `() => [...document.querySelectorAll('button')].some(b => b.textContent.trim() === '登出' && b.offsetParent !== null)` 為 `true`。不要用 `browser_wait_for('登出')`：mobile 選單裡另有一顆隱藏的「登出」會先被命中而逾時。截 `01-logged-in.png`。
 
 ## 3. 前置狀態：清購物車、選商品、記庫存
 
