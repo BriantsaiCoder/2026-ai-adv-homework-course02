@@ -21,6 +21,10 @@ npx vitest run
 
 GitHub Actions（`.github/workflows/ci.yml`）於 PR 與 push 至 main 時，以 Node 24 執行 `npm ci` → `npm run css:build` → `npm test`。CI 以測試用假值注入 `JWT_SECRET`；測試 DB 為 in-memory（見下方 `DB_PATH` 設定），每個測試檔各自建表並植入種子資料。
 
+## E2E（綠界付款）
+
+結帳到綠界付款完成的瀏覽器 E2E 不在 Vitest／CI 內（依賴外部綠界 stage 環境），由 Claude Code skill [`.claude/skills/e2e-ecpay-checkout/SKILL.md`](../.claude/skills/e2e-ecpay-checkout/SKILL.md) 以 Playwright MCP 執行：登入 seed admin → 加入購物車 → 結帳 → 綠界「網路ATM」＋台灣土地銀行模擬付款 → 以 API 驗證訂單 `paid`、購物車清空、庫存減 1，截圖存 `.playwright-mcp/e2e-ecpay-checkout/<timestamp>/`。每次執行會寫入開發用 `database.sqlite`（新增訂單、扣庫存）。
+
 ## 測試設定
 
 **設定檔**：`vitest.config.js`

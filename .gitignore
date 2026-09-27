@@ -39,3 +39,4 @@ coverage/
 .claude/*.local.json
 public/css/output.css
 qa.md
+.playwright-mcp/
