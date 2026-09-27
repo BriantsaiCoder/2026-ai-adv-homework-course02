@@ -173,6 +173,10 @@ async function queryTradeInfo(merchantTradeNo, config) {
   if (!verifyCheckMacValue(result, cfg.hashKey, cfg.hashIV)) {
     throw new Error('ECPay QueryTradeInfo CheckMacValue 驗證失敗');
   }
+  // 簽章只證明出自綠界；已付款結果須對應本次查詢的編號，防止挪用他筆交易的真實回應
+  if (result.TradeStatus === '1' && result.MerchantTradeNo !== merchantTradeNo) {
+    throw new Error('ECPay QueryTradeInfo MerchantTradeNo 不符');
+  }
   return result;
 }
 
