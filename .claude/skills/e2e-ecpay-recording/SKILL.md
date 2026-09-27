@@ -21,7 +21,7 @@ description: 錄影版綠界結帳 E2E：先以 Playwright 開始錄影，再完
 
 1. 取一個 timestamp（`date +%Y%m%d-%H%M%S`）。影片與 `e2e-ecpay-checkout` 的截圖共用 `.playwright-mcp/e2e-ecpay-checkout/<timestamp>/`，執行該 skill 時沿用同一個 timestamp。
 2. 影片路徑用絕對路徑：`<repo 絕對路徑>/.playwright-mcp/e2e-ecpay-checkout/<timestamp>/e2e-ecpay-checkout.webm`。`browser_run_code_unsafe` 的相對路徑不以 repo 為基準。
-3. 先照 `e2e-ecpay-checkout` 第 1 步確認 3001 server 就緒，再 `browser_navigate` 到 `http://localhost:3001/login`，並照其第 2 步清掉殘留登入（只回傳布林值的檢查；為 `true` 時 `localStorage.clear()` 後重新整理），才開始錄影。否則影片開頭會是一段 `about:blank` 或前次殘留頁面，header 還可能顯示前次的登入狀態；server 啟動或等待權限核准時前導更長。
+3. 先照 `e2e-ecpay-checkout` 第 1 步確認 3001 server 就緒，再 `browser_navigate` 到 `http://localhost:3001/login`，並照其第 2 步清掉殘留登入（只回傳布林值的檢查；為 `true` 時 `localStorage.clear()` 後重新整理），才開始錄影。不先做這些，影片開頭會是一段 `about:blank` 或前次殘留頁面，header 還可能顯示前次的登入狀態；server 啟動或等待權限核准時前導更長。server 若由此步啟動，回報時記為本次啟動（checkout 之後只會看到既有 server）。
 
 ## 3. 開始錄影
 
