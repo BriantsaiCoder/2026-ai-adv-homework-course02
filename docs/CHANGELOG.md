@@ -25,7 +25,7 @@
 - 訪客購物車於登入／註冊後遺失：`POST /api/auth/login`、`POST /api/auth/register` 帶 `X-Session-Id` 時，於 transaction 內將訪客品項併入使用者購物車（同商品數量相加、上限為庫存），結帳頁不再因空購物車被導回 `/cart`
 - 註冊時建立帳號與合併訪客購物車改為同一 transaction：合併失敗不再留下已建立的帳號（先前回 500 後重試會得 409）
 - 重新前往綠界付款被拒（10300028「訂單編號重覆」）：付款嘗試（`POST /api/orders/:id/payment-attempt`）每次改發新的 MerchantTradeNo（order_no 去除連字號 + 兩位數遞增序號，最多 99 次）並寫回訂單；換號前先查詢已付款則直接標記 `paid`，避免重複扣款（查詢範圍見下一條）；僅在未付款（`0`）、交易失敗（`10200095`）或從未送出（`10200047`）時換號，查詢失敗、逾時（`queryTradeInfo` 加 10 秒逾時）、驗簽失敗、回應缺 TradeStatus 或其他代碼時不換號，回 503 並於訂單頁顯示「暫時無法連線綠界」；換號以條件式更新寫入，併發請求不會取得同一編號
-- 換號後才在較早編號完成的付款被漏記（兩個分頁、或在較早嘗試取得的 ATM／超商代碼於換號後繳費）：付款嘗試與 `check-payment` 改為由新到舊查詢訂單曾發出的每個 MerchantTradeNo（`queryIssuedTrades`），任一已付款即標記 `paid` 並記錄該編號；付款嘗試上限由 20 字元（約 9999 次）降為 99 次，使每次請求最多查 100 次
+- 換號後才在較早編號完成的付款被漏記（兩個分頁、或在較早嘗試取得的 ATM／超商代碼於換號後繳費）：付款嘗試與 `check-payment` 改為由新到舊查詢訂單曾發出的每個 MerchantTradeNo（`queryIssuedTrades`），任一已付款即標記 `paid` 並記錄該編號；付款嘗試上限 99 次，每次請求最多查 100 次
 - QueryTradeInfo 回應未驗證簽章即採信 TradeStatus：`queryTradeInfo` 改為驗證回應 CheckMacValue（不符或缺少即 throw），並要求回應的 MerchantTradeNo 等於查詢編號，`check-payment` 與付款換號流程皆不再依未驗證的回應標記 `paid`；回應改按原文解析（綠界回應值未經 URL 編碼，`URLSearchParams` 會把商品名稱中的 `+`、`%XX` 解錯而誤判驗簽失敗）
 
 ## [1.0.0] - 2026-04-12
