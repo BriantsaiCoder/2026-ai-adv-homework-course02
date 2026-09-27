@@ -54,7 +54,7 @@ describe('ECPay payment attempts', () => {
     vi.unstubAllGlobals();
   });
 
-  it('issues a fresh MerchantTradeNo per attempt and check-payment queries the latest', async () => {
+  it('issues a fresh MerchantTradeNo per attempt and check-payment queries every issued number newest-first', async () => {
     const { token, orderId } = await createOrder();
     const fetchMock = stubQueryTradeInfo('0');
 
@@ -219,6 +219,19 @@ describe('ECPay payment attempts', () => {
 
     expect(paid.status).toBe(409);
     expect(paid.body.error).toBe('ORDER_PAID');
+  });
+
+  it('keeps the trade no when the stored suffix is not numeric', async () => {
+    const { token, orderId } = await createOrder();
+    const { order_no } = db.prepare('SELECT order_no FROM orders WHERE id = ?').get(orderId);
+    const corrupt = order_no.replace(/-/g, '') + 'A1';
+    db.prepare('UPDATE orders SET merchant_trade_no = ? WHERE id = ?').run(corrupt, orderId);
+    stubQueryTradeInfo('0');
+
+    const res = await attempt(token, orderId);
+
+    expect(res.status).toBe(503);
+    expect(tradeNoOf(orderId)).toBe(corrupt);
   });
 
   it.each([

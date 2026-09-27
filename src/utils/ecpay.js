@@ -175,7 +175,10 @@ function tradeNoAt(order, attempt) {
 
 function attemptOf(order) {
   const base = order.order_no.replace(/-/g, '');
-  return Number((order.merchant_trade_no || base).slice(base.length));
+  const attempt = Number((order.merchant_trade_no || base).slice(base.length));
+  // 序號無法解析時無從列舉曾發出的編號，丟錯讓呼叫端 fail-closed（不換號）
+  if (!Number.isInteger(attempt)) throw new Error('無法解析 merchant_trade_no 序號：' + order.merchant_trade_no);
+  return attempt;
 }
 
 // 下一次付款嘗試的編號；已達上限回 null
