@@ -36,6 +36,7 @@
 - 密碼以 bcrypt 雜湊儲存（正式環境 salt rounds = 10，測試環境 = 1）
 - 新使用者 role 固定為 `'user'`，無法透過 API 建立 admin
 - Email 唯一性由資料庫 UNIQUE 約束保證
+- 帶 `X-Session-Id` header 時，合併訪客購物車（見[訪客購物車合併](#訪客購物車合併)）
 
 **錯誤情境**：
 
@@ -61,6 +62,7 @@
 - 使用 `bcrypt.compareSync()` 比對密碼
 - 無論是 email 不存在或密碼錯誤，一律回 401 + 相同訊息
 - Token 有效期 7 天，payload 包含 `{ userId, email, role }`
+- 帳密驗證通過且帶 `X-Session-Id` header 時，合併訪客購物車（見[訪客購物車合併](#訪客購物車合併)）
 
 **錯誤情境**：
 
@@ -213,6 +215,19 @@
 | 狀態碼 | 錯誤碼 | 情境 |
 |--------|--------|------|
 | 404 | NOT_FOUND | 品項不存在或非本人所有 |
+
+### 訪客購物車合併
+
+**行為描述**：`POST /api/auth/register` 與 `POST /api/auth/login` 成功時，若請求帶 `X-Session-Id`，將該 session 的購物車品項併入使用者購物車，使訪客加購後登入仍可結帳。前端 `apiFetch` 每個請求皆附 `X-Session-Id`，無需額外呼叫。
+
+**業務邏輯**（`authRoutes.js` 的 `mergeGuestCart`，單一 `db.transaction()`）：
+1. 取出 `session_id` 的品項並 JOIN 商品庫存
+2. 使用者已有同商品 → 數量相加，上限為 `stock`，UPDATE 使用者品項後刪除訪客品項
+3. 使用者無此商品 → 將該列改為 `user_id`、`session_id = NULL`，數量上限為 `stock`
+4. 商品已售完（`stock = 0`）→ 刪除訪客品項，不寫入 0（違反 `CHECK(quantity > 0)`）
+5. 登入／註冊回應格式不變
+
+清空 `session_id` 使同一瀏覽器登出後無法再以訪客身分存取已合併品項。
 
 ---
 

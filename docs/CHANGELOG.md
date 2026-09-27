@@ -15,6 +15,9 @@
 - 結帳頁面（checkout.js）：送出訂單後導向綠界付款頁面，不再直接跳轉訂單詳情
 - 訂單詳情頁面（order-detail.ejs / order-detail.js）：原「付款成功/失敗」模擬按鈕改為「查詢付款狀態」與「前往付款」按鈕；從綠界導回時自動觸發付款狀態查詢
 
+### Fixed
+- 訪客購物車於登入／註冊後遺失：`POST /api/auth/login`、`POST /api/auth/register` 帶 `X-Session-Id` 時，於 transaction 內將訪客品項併入使用者購物車（同商品數量相加、上限為庫存），結帳頁不再因空購物車被導回 `/cart`
+
 ## [1.0.0] - 2026-04-12
 
 ### 新增

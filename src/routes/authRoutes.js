@@ -7,12 +7,47 @@ const authMiddleware = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
+// Move guest (session) cart rows to the user; duplicates are summed, all quantities capped at stock.
+// session_id is cleared so the same browser can no longer reach these rows as a guest after logout.
+const mergeGuestCart = db.transaction((sessionId, userId) => {
+  const guestItems = db.prepare(
+    `SELECT ci.id, ci.product_id, ci.quantity, p.stock
+     FROM cart_items ci JOIN products p ON ci.product_id = p.id
+     WHERE ci.session_id = ?`
+  ).all(sessionId);
+
+  for (const item of guestItems) {
+    const existing = db.prepare(
+      'SELECT id, quantity FROM cart_items WHERE user_id = ? AND product_id = ?'
+    ).get(userId, item.product_id);
+    const qty = Math.min((existing ? existing.quantity : 0) + item.quantity, item.stock);
+
+    if (existing) {
+      if (qty >= 1) db.prepare('UPDATE cart_items SET quantity = ? WHERE id = ?').run(qty, existing.id);
+      db.prepare('DELETE FROM cart_items WHERE id = ?').run(item.id);
+    } else if (qty >= 1) {
+      db.prepare('UPDATE cart_items SET user_id = ?, session_id = NULL, quantity = ? WHERE id = ?')
+        .run(userId, qty, item.id);
+    } else {
+      // Sold out: quantity 0 would violate CHECK(quantity > 0)
+      db.prepare('DELETE FROM cart_items WHERE id = ?').run(item.id);
+    }
+  }
+});
+
 /**
  * @openapi
  * /api/auth/register:
  *   post:
  *     summary: 註冊新帳號
  *     tags: [Auth]
+ *     parameters:
+ *       - in: header
+ *         name: X-Session-Id
+ *         required: false
+ *         description: 訪客購物車 session；帶入時將其購物車合併至此帳號
+ *         schema:
+ *           type: string
  *     requestBody:
  *       required: true
  *       content:
@@ -107,6 +142,8 @@ router.post('/register', (req, res) => {
     'INSERT INTO users (id, email, password_hash, name, role) VALUES (?, ?, ?, ?, ?)'
   ).run(id, email, passwordHash, name, 'user');
 
+  if (req.sessionId) mergeGuestCart(req.sessionId, id);
+
   const user = db.prepare('SELECT id, email, name, role, created_at FROM users WHERE id = ?').get(id);
 
   const token = jwt.sign(
@@ -131,6 +168,13 @@ router.post('/register', (req, res) => {
  *   post:
  *     summary: 登入
  *     tags: [Auth]
+ *     parameters:
+ *       - in: header
+ *         name: X-Session-Id
+ *         required: false
+ *         description: 訪客購物車 session；帶入時將其購物車合併至此帳號
+ *         schema:
+ *           type: string
  *     requestBody:
  *       required: true
  *       content:
@@ -206,6 +250,8 @@ router.post('/login', (req, res) => {
       message: 'Email 或密碼錯誤'
     });
   }
+
+  if (req.sessionId) mergeGuestCart(req.sessionId, user.id);
 
   const token = jwt.sign(
     { userId: user.id, email: user.email, role: user.role },
