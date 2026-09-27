@@ -25,6 +25,8 @@ GitHub Actions（`.github/workflows/ci.yml`）於 PR 與 push 至 main 時，以
 
 結帳到綠界付款完成的瀏覽器 E2E 不在 Vitest／CI 內（依賴外部綠界 stage 環境），由 Claude Code skill [`.claude/skills/e2e-ecpay-checkout/SKILL.md`](../.claude/skills/e2e-ecpay-checkout/SKILL.md) 以 Playwright MCP 執行：登入 seed admin → 加入購物車 → 結帳 → 綠界「網路ATM」＋台灣土地銀行模擬付款 → 以 API 驗證訂單 `paid`、購物車清空、庫存減 1，截圖存 `.playwright-mcp/e2e-ecpay-checkout/<timestamp>/`。每次執行會寫入開發用 `database.sqlite`（新增訂單、扣庫存）。
 
+需要影片時改用 [`.claude/skills/e2e-ecpay-recording/SKILL.md`](../.claude/skills/e2e-ecpay-recording/SKILL.md)：以 Playwright `page.screencast` 錄下上述整段流程，輸出 WebM（VP8，可直接上傳 YouTube）與截圖存同一目錄。首次使用需下載 Playwright 自帶的 ffmpeg（約 1 MiB）。
+
 ## 測試設定
 
 **設定檔**：`vitest.config.js`

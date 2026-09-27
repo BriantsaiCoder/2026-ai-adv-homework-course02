@@ -14,6 +14,7 @@
 - mobile 漢堡選單與 sticky 購買／結帳列
 - GitHub Actions CI（`.github/workflows/ci.yml`）：PR 與 push 至 main 時執行 `npm ci` → `npm run css:build` → `npm test`
 - E2E skill `.claude/skills/e2e-ecpay-checkout/`：以 Playwright MCP 跑登入 → 加入購物車 → 結帳 → 綠界網路ATM（台灣土地銀行）模擬付款，API 驗證並附各步驟截圖；`.gitignore` 忽略 `.playwright-mcp/`
+- 錄影 skill `.claude/skills/e2e-ecpay-recording/`：以 Playwright `page.screencast` 錄下 `e2e-ecpay-checkout` 全程，輸出可上傳 YouTube 的 WebM 影片
 
 ### Changed
 - 訂單金額計入運費：小計未滿 NT$ 500 加收 NT$ 150（`total_amount` 與綠界 `TotalAmount` 一致）
