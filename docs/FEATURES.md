@@ -36,7 +36,7 @@
 - 密碼以 bcrypt 雜湊儲存（正式環境 salt rounds = 10，測試環境 = 1）
 - 新使用者 role 固定為 `'user'`，無法透過 API 建立 admin
 - Email 唯一性由資料庫 UNIQUE 約束保證
-- 帶 `X-Session-Id` header 時，合併訪客購物車（見[訪客購物車合併](#訪客購物車合併)）
+- 帶 `X-Session-Id` header 時，合併訪客購物車（見[訪客購物車合併](#訪客購物車合併)）；建立帳號與合併在同一 transaction，合併失敗則整筆回滾（回 500、帳號不建立，重試不會撞 409）
 
 **錯誤情境**：
 

@@ -22,6 +22,7 @@
 
 ### Fixed
 - 訪客購物車於登入／註冊後遺失：`POST /api/auth/login`、`POST /api/auth/register` 帶 `X-Session-Id` 時，於 transaction 內將訪客品項併入使用者購物車（同商品數量相加、上限為庫存），結帳頁不再因空購物車被導回 `/cart`
+- 註冊時建立帳號與合併訪客購物車改為同一 transaction：合併失敗不再留下已建立的帳號（先前回 500 後重試會得 409）
 
 ## [1.0.0] - 2026-04-12
 

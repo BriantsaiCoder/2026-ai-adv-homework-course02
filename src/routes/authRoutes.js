@@ -138,11 +138,14 @@ router.post('/register', (req, res) => {
   const id = uuidv4();
   const passwordHash = bcrypt.hashSync(password, 10);
 
-  db.prepare(
-    'INSERT INTO users (id, email, password_hash, name, role) VALUES (?, ?, ?, ?, ?)'
-  ).run(id, email, passwordHash, name, 'user');
+  // One transaction: a failed guest-cart merge must not leave a created account behind (retry would hit 409)
+  db.transaction(() => {
+    db.prepare(
+      'INSERT INTO users (id, email, password_hash, name, role) VALUES (?, ?, ?, ?, ?)'
+    ).run(id, email, passwordHash, name, 'user');
 
-  if (req.sessionId) mergeGuestCart(req.sessionId, id);
+    if (req.sessionId) mergeGuestCart(req.sessionId, id);
+  })();
 
   const user = db.prepare('SELECT id, email, name, role, created_at FROM users WHERE id = ?').get(id);
 

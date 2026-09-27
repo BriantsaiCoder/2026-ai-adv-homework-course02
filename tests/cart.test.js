@@ -111,6 +111,37 @@ describe('Cart API', () => {
     expect(guestCart.body.data.items.length).toBe(0);
   });
 
+  it('should roll back the new account when the guest-cart merge fails during register', async () => {
+    const db = require('../src/database');
+    const guestSession = 'merge-atomic-' + Date.now();
+    const email = `atomic-${Date.now()}@example.com`;
+    const register = () => request(app)
+      .post('/api/auth/register')
+      .set('X-Session-Id', guestSession)
+      .send({ email, password: 'password123', name: '回滾測試' });
+    await request(app)
+      .post('/api/cart')
+      .set('X-Session-Id', guestSession)
+      .send({ productId, quantity: 1 });
+
+    // TEMP trigger fails the merge's move of the guest row without depending on the route's SQL text
+    db.exec("CREATE TEMP TRIGGER fail_merge BEFORE UPDATE OF user_id ON main.cart_items BEGIN SELECT RAISE(ABORT, 'forced'); END");
+    try {
+      expect((await register()).status).toBe(500);
+    } finally {
+      db.exec('DROP TRIGGER IF EXISTS temp.fail_merge');
+    }
+
+    const retry = await register();
+    expect(retry.status).toBe(201);
+    const userCart = await request(app)
+      .get('/api/cart')
+      .set('Authorization', `Bearer ${retry.body.data.token}`);
+    expect(userCart.body.data.items).toEqual([
+      expect.objectContaining({ product_id: productId, quantity: 1 })
+    ]);
+  });
+
   it('should sum duplicate items capped at stock when merging on login', async () => {
     const { token, user } = await registerUser();
     const guestSession = 'merge-login-' + Date.now();
