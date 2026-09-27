@@ -17,6 +17,10 @@ npm run test
 npx vitest run
 ```
 
+## CI
+
+GitHub Actions（`.github/workflows/ci.yml`）於 PR 與 push 至 main 時，以 Node 24 執行 `npm ci` → `npm run css:build` → `npm test`。CI 以測試用假值注入 `JWT_SECRET`，並於全新 runner 上建立 SQLite 種子資料。
+
 ## 測試設定
 
 **設定檔**：`vitest.config.js`

@@ -10,6 +10,7 @@
 - 新增 `GET /ecpay/payment/:orderId` 頁面路由：產生自動送出的 ECPay 付款表單
 - 新增 `POST /api/orders/:id/check-payment` API：透過 QueryTradeInfo API 主動查詢付款狀態（取代本地端無法接收的 Server Notify）
 - 訂單新增 `merchant_trade_no` 欄位：對應綠界 MerchantTradeNo，由 order_no 去除連字號產生
+- GitHub Actions CI（`.github/workflows/ci.yml`）：PR 與 push 至 main 時執行 `npm ci` → `npm run css:build` → `npm test`
 
 ### Changed
 - 結帳頁面（checkout.js）：送出訂單後導向綠界付款頁面，不再直接跳轉訂單詳情
