@@ -8,10 +8,16 @@ createApp({
     const loading = ref(true);
 
     const statusMap = {
-      pending: { label: '待付款', cls: 'bg-apricot/20 text-apricot' },
-      paid: { label: '已付款', cls: 'bg-sage/20 text-sage' },
-      failed: { label: '付款失敗', cls: 'bg-red-100 text-red-600' },
+      pending: { label: '待付款', cls: 'bg-apricot-bg text-apricot-ink' },
+      paid: { label: '已付款', cls: 'bg-sage-bg text-sage-ink' },
+      failed: { label: '付款失敗', cls: 'bg-error-bg text-error' },
+      unknown: { label: '處理中', cls: 'bg-line text-ink-2' },
     };
+
+    // SQLite datetime('now') is UTC without a zone suffix.
+    function formatDate(value) {
+      return new Date(value.replace(' ', 'T') + 'Z').toLocaleDateString('zh-TW');
+    }
 
     onMounted(async function () {
       try {
@@ -24,6 +30,6 @@ createApp({
       }
     });
 
-    return { orders, loading, statusMap };
+    return { orders, loading, statusMap, formatDate };
   }
 }).mount('#app');

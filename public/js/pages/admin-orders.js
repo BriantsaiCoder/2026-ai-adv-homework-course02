@@ -47,6 +47,13 @@ createApp({
       }
     }
 
+    // total_amount includes shipping; derive it from the item snapshot.
+    function shippingOf(order) {
+      return order.total_amount - order.items.reduce(function (sum, item) {
+        return sum + item.product_price * item.quantity;
+      }, 0);
+    }
+
     watch(statusFilter, function () {
       loadOrders(1);
     });
@@ -58,7 +65,7 @@ createApp({
     return {
       orders, pagination, loading, statusFilter,
       detailVisible, detailOrder, detailLoading,
-      statusMap, loadOrders, viewDetail
+      statusMap, loadOrders, viewDetail, shippingOf
     };
   }
 }).mount('#app');

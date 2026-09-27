@@ -1,90 +1,75 @@
-<div id="app" data-order-id="<%= orderId %>" data-payment-result="<%= paymentResult %>">
-  <h1 class="text-2xl font-bold text-text-primary mb-6" style="font-family: 'Noto Serif TC', serif;">訂單詳情</h1>
+<div id="app" data-order-id="<%= orderId %>" data-payment-result="<%= paymentResult %>" class="container-page pb-12 pt-6 lg:pb-28 lg:pt-12">
+  <div v-if="loading" class="flex justify-center py-24"><div class="spinner"></div></div>
 
-  <div v-if="loading" class="flex justify-center py-12">
-    <div class="w-8 h-8 border-4 border-rose-primary border-t-transparent rounded-full animate-spin"></div>
+  <div v-else-if="!order" class="py-24 text-center">
+    <h1 class="font-serif text-2xl font-semibold text-stem">找不到這筆訂單</h1>
+    <a href="/orders" class="btn-primary mt-6">查看我的訂單</a>
   </div>
 
-  <template v-else-if="order">
-    <!-- Payment Result Alert -->
-    <div
-      v-if="paymentResult && paymentMessages[paymentResult]"
-      class="rounded-xl p-4 mb-6 text-sm"
-      :class="paymentMessages[paymentResult].cls"
-    >
-      {{ paymentMessages[paymentResult].text }}
+  <!-- 付款完成 -->
+  <div v-else-if="view === 'complete'" class="flex flex-col gap-7 lg:items-center lg:gap-12">
+    <%- include('../partials/checkout-steps', { cls: 'lg:w-[560px]' }) %>
+    <div class="flex flex-col items-center gap-3.5 text-center lg:w-[720px] lg:gap-[18px] lg:pt-4">
+      <span class="flex h-[60px] w-[60px] items-center justify-center rounded-full bg-sage-bg text-sage-ink lg:h-[72px] lg:w-[72px]"><%- include('../partials/icon', { name: 'check', cls: 'w-7 h-7 lg:w-[34px] lg:h-[34px]' }) %></span>
+      <h1 class="font-serif text-[30px] font-semibold text-stem lg:text-[44px]">{{ justPaid ? '付款完成，謝謝你' : '訂單已付款' }}</h1>
+      <p class="text-sm leading-[1.7] text-ink-2 lg:text-base lg:leading-[1.8]">我們已收到款項，花藝師會開始準備你的花禮。<span class="hidden lg:inline">你可以在「我的訂單」隨時查看這筆訂單。</span></p>
     </div>
 
-    <!-- Order Info -->
-    <div class="bg-white rounded-2xl shadow-sm p-6 mb-6">
-      <div class="flex items-start justify-between">
-        <div>
-          <p class="text-sm text-text-secondary">訂單編號：{{ order.order_no }}</p>
-          <p class="text-xs text-text-muted mt-1">建立日期：{{ new Date(order.created_at).toLocaleDateString('zh-TW') }}</p>
-        </div>
-        <span
-          class="text-xs px-3 py-1 rounded-full font-medium"
-          :class="statusMap[order.status]?.cls || 'bg-gray-100 text-gray-600'"
-        >
-          {{ statusMap[order.status]?.label || order.status }}
-        </span>
+    <div class="flex flex-col gap-7 lg:w-[880px] lg:gap-8 lg:rounded-md lg:border lg:border-line lg:px-10 lg:py-9">
+      <dl class="flex flex-col gap-3 rounded-md border border-line p-[18px] lg:flex-row lg:gap-6 lg:rounded-none lg:border-0 lg:border-b lg:p-0 lg:pb-7">
+        <div class="flex justify-between lg:flex-1 lg:flex-col lg:gap-1.5"><dt class="text-sm text-ink-3 lg:text-[13px]">訂單編號</dt><dd class="font-num text-sm lg:text-lg">{{ order.order_no }}</dd></div>
+        <div class="flex justify-between lg:flex-1 lg:flex-col lg:gap-1.5"><dt class="text-sm text-ink-3 lg:text-[13px]">付款金額</dt><dd class="font-num text-sm lg:text-lg">NT$ {{ order.total_amount.toLocaleString() }}</dd></div>
+        <div class="flex justify-between lg:flex-1 lg:flex-col lg:gap-1.5"><dt class="text-sm text-ink-3 lg:text-[13px]">付款方式</dt><dd class="text-sm lg:text-lg">綠界 ECPay</dd></div>
+        <div class="flex items-center justify-between lg:flex-col lg:items-start lg:gap-1.5"><dt class="text-sm text-ink-3 lg:text-[13px]">狀態</dt><dd><span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-medium" :class="status.cls"><span class="h-1.5 w-1.5 rounded-full bg-current"></span>{{ status.label }}</span></dd></div>
+      </dl>
+      <%- include('../partials/order-summary') %>
+    </div>
+
+    <div class="flex flex-col gap-3 lg:flex-row lg:gap-4">
+      <a href="/orders" class="btn-primary">查看我的訂單</a>
+      <a href="/#products" class="btn-secondary">繼續選購</a>
+    </div>
+  </div>
+
+  <!-- 訂單確認／付款未完成 -->
+  <div v-else class="flex flex-col gap-7 lg:gap-10">
+    <%- include('../partials/checkout-steps', { cls: 'lg:w-[560px]' }) %>
+
+    <div v-if="view === 'failed'" role="alert" class="-mt-1 flex items-center gap-3.5 rounded-md bg-error-bg px-4 py-4 lg:-mt-2 lg:px-[22px]">
+      <span class="text-error"><%- include('../partials/icon', { name: 'circle-alert' }) %></span>
+      <div>
+        <p class="text-[15px] font-medium text-error">{{ order.status === 'failed' ? '付款失敗' : '尚未收到付款' }}</p>
+        <p class="mt-1 text-sm text-ink-2">{{ order.status === 'failed' ? '這筆訂單已標記為付款失敗，請重新選購下單。' : '若選擇 ATM 或超商代碼，完成繳費後請點「查詢付款狀態」；若付款未成功，可重新前往綠界付款。' }}</p>
       </div>
     </div>
 
-    <!-- Recipient Info -->
-    <div class="bg-white rounded-2xl shadow-sm p-6 mb-6">
-      <h2 class="font-medium text-text-primary mb-3">收件資訊</h2>
-      <div class="text-sm space-y-2 text-text-secondary">
-        <p>收件人：{{ order.recipient_name }}</p>
-        <p>Email：{{ order.recipient_email }}</p>
-        <p>地址：{{ order.recipient_address }}</p>
+    <div class="flex flex-col gap-2.5 lg:flex-row lg:items-end lg:justify-between">
+      <div>
+        <h1 class="font-serif text-[28px] font-semibold text-stem lg:text-[40px]">{{ view === 'failed' ? '付款未完成' : '確認訂單，前往付款' }}</h1>
+        <p class="mt-2.5 text-sm leading-[1.7] text-ink-2 lg:mt-3 lg:text-base">{{ view === 'failed' ? '目前尚未收到這筆訂單的付款。訂單仍為你保留，可重新前往付款。' : '訂單已建立。請確認內容無誤，再前往綠界完成付款。' }}</p>
+      </div>
+      <div class="flex items-center justify-between pt-2 lg:gap-7 lg:pt-0">
+        <div class="lg:flex lg:flex-col lg:gap-1"><span class="hidden text-[13px] text-ink-3 lg:block">訂單編號</span><span class="font-num text-sm text-ink-2 lg:text-base lg:text-ink">{{ order.order_no }}</span></div>
+        <div class="hidden lg:flex lg:flex-col lg:gap-1"><span class="text-[13px] text-ink-3">建立日期</span><span class="font-num">{{ createdDate }}</span></div>
+        <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-medium" :class="status.cls"><span class="h-1.5 w-1.5 rounded-full bg-current"></span>{{ status.label }}</span>
       </div>
     </div>
 
-    <!-- Order Items -->
-    <div class="bg-white rounded-2xl shadow-sm p-6 mb-6">
-      <h2 class="font-medium text-text-primary mb-3">商品明細</h2>
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="border-b border-gray-100 text-text-muted">
-            <th class="text-left py-2 font-normal">商品名稱</th>
-            <th class="text-right py-2 font-normal">單價</th>
-            <th class="text-right py-2 font-normal">數量</th>
-            <th class="text-right py-2 font-normal">小計</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="item in order.items" :key="item.id" class="border-b border-gray-50">
-            <td class="py-3 text-text-primary">{{ item.product_name }}</td>
-            <td class="py-3 text-right text-text-secondary">NT$ {{ item.product_price.toLocaleString() }}</td>
-            <td class="py-3 text-right text-text-secondary">{{ item.quantity }}</td>
-            <td class="py-3 text-right text-text-primary font-medium">NT$ {{ (item.product_price * item.quantity).toLocaleString() }}</td>
-          </tr>
-        </tbody>
-        <tfoot>
-          <tr>
-            <td colspan="3" class="pt-3 text-right font-bold text-text-primary">總計</td>
-            <td class="pt-3 text-right font-bold text-rose-primary text-lg">NT$ {{ order.total_amount.toLocaleString() }}</td>
-          </tr>
-        </tfoot>
-      </table>
+    <div class="flex flex-col gap-7 lg:flex-row-reverse lg:items-start lg:gap-14">
+      <aside class="flex flex-col gap-3.5 rounded-md bg-tissue px-5 py-[22px] lg:w-[420px] lg:shrink-0 lg:gap-5 lg:p-8">
+        <p class="text-sm text-ink-2 lg:text-[15px]">應付金額</p>
+        <p class="font-num text-[34px] text-stem lg:text-[44px]">NT$ {{ order.total_amount.toLocaleString() }}</p>
+        <p class="hidden items-center gap-2.5 text-sm text-ink-2 lg:flex"><span class="text-sage-ink"><%- include('../partials/icon', { name: 'shield-check', cls: 'w-[18px] h-[18px]' }) %></span>綠界 ECPay 線上付款</p>
+        <template v-if="order.status === 'pending'">
+          <a :href="'/ecpay/payment/' + order.id" class="btn-primary lg:h-[54px]">{{ view === 'failed' ? '重新前往綠界付款' : '前往綠界付款' }}</a>
+          <button @click="checkPayment" :disabled="paying" class="btn-secondary lg:h-[52px]">{{ paying ? '查詢中…' : '我已付款，查詢付款狀態' }}</button>
+          <p class="text-xs leading-[1.7] text-ink-3 lg:text-[13px]">付款完成後會自動回到本站並更新狀態。<span class="hidden lg:inline">若狀態未更新，請點「查詢付款狀態」。</span></p>
+        </template>
+        <a v-else href="/#products" class="btn-primary">重新選購</a>
+      </aside>
+      <div class="flex flex-col gap-7 lg:flex-1 lg:gap-11">
+        <%- include('../partials/order-summary') %>
+      </div>
     </div>
-
-    <!-- Payment Actions -->
-    <div v-if="order.status === 'pending'" class="flex gap-4">
-      <button
-        @click="checkPayment"
-        :disabled="paying"
-        class="bg-sage text-white px-8 py-3 rounded-full text-sm font-medium hover:bg-sage/90 transition-colors disabled:opacity-50"
-      >
-        {{ paying ? '查詢中...' : '查詢付款狀態' }}
-      </button>
-      <a
-        :href="'/ecpay/payment/' + order.id"
-        class="inline-block bg-rose-primary text-white px-8 py-3 rounded-full text-sm font-medium hover:bg-rose-dark transition-colors text-center"
-      >
-        前往付款
-      </a>
-    </div>
-  </template>
+  </div>
 </div>

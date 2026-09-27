@@ -4,6 +4,7 @@ createApp({
   setup() {
     const productId = document.getElementById('app').dataset.productId;
     const product = ref(null);
+    const related = ref([]);
     const loading = ref(true);
     const notFound = ref(false);
     const quantity = ref(1);
@@ -17,25 +18,29 @@ createApp({
       if (product.value && quantity.value < product.value.stock) quantity.value++;
     }
 
-    async function addToCart() {
+    async function addMain() {
       if (!product.value || adding.value) return;
       adding.value = true;
+      await addProductToCart(product.value.id, quantity.value);
+      adding.value = false;
+    }
+
+    async function addToCart(p) {
+      if (p._adding) return;
+      p._adding = true;
+      await addProductToCart(p.id, 1);
+      p._adding = false;
+    }
+
+    async function loadRelated() {
       try {
-        await apiFetch('/api/cart', {
-          method: 'POST',
-          body: JSON.stringify({ productId: product.value.id, quantity: quantity.value })
-        });
-        Notification.show('已加入購物車', 'success');
-        var badge = document.getElementById('cart-badge');
-        if (badge) {
-          var count = parseInt(badge.textContent || '0') + 1;
-          badge.textContent = count;
-          badge.style.display = 'flex';
-        }
+        const res = await apiFetch('/api/products?limit=5');
+        related.value = res.data.products
+          .filter(function (p) { return p.id !== productId; })
+          .slice(0, 4)
+          .map(function (p) { p._adding = false; return p; });
       } catch (e) {
-        Notification.show('加入購物車失敗', 'error');
-      } finally {
-        adding.value = false;
+        related.value = [];
       }
     }
 
@@ -43,6 +48,7 @@ createApp({
       try {
         const res = await apiFetch('/api/products/' + productId);
         product.value = res.data;
+        loadRelated();
       } catch (e) {
         notFound.value = true;
       } finally {
@@ -50,6 +56,6 @@ createApp({
       }
     });
 
-    return { product, loading, notFound, quantity, adding, decrease, increase, addToCart };
+    return { product, related, loading, notFound, quantity, adding, decrease, increase, addMain, addToCart, sizedImage };
   }
 }).mount('#app');

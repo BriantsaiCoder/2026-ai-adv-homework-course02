@@ -1,4 +1,4 @@
-const { createApp, ref, onMounted } = Vue;
+const { createApp, ref, computed, onMounted } = Vue;
 
 createApp({
   setup() {
@@ -6,6 +6,7 @@ createApp({
 
     const el = document.getElementById('app');
     const orderId = el.dataset.orderId;
+    // ECPay ClientBackURL returns with ?payment=pending; after the auto check it becomes success or unpaid.
     const paymentResult = ref(el.dataset.paymentResult || null);
 
     const order = ref(null);
@@ -13,19 +14,39 @@ createApp({
     const paying = ref(false);
 
     const statusMap = {
-      pending: { label: '待付款', cls: 'bg-apricot/20 text-apricot' },
-      paid: { label: '已付款', cls: 'bg-sage/20 text-sage' },
-      failed: { label: '付款失敗', cls: 'bg-red-100 text-red-600' },
+      pending: { label: '待付款', cls: 'bg-apricot-bg text-apricot-ink' },
+      paid: { label: '已付款', cls: 'bg-sage-bg text-sage-ink' },
+      failed: { label: '付款失敗', cls: 'bg-error-bg text-error' },
     };
 
-    const paymentMessages = {
-      success: { text: '付款成功！感謝您的購買。', cls: 'bg-sage/10 text-sage border border-sage/20' },
-      failed: { text: '付款失敗，請重試。', cls: 'bg-red-50 text-red-600 border border-red-100' },
-      cancel: { text: '付款已取消。', cls: 'bg-apricot/10 text-apricot border border-apricot/20' },
-      pending: { text: '付款處理中，請點擊「查詢付款狀態」確認結果。', cls: 'bg-apricot/10 text-apricot border border-apricot/20' },
-    };
+    const status = computed(function () {
+      return statusMap[order.value.status] || { label: order.value.status, cls: 'bg-line text-ink-2' };
+    });
 
-    async function checkPayment() {
+    const view = computed(function () {
+      if (order.value.status === 'paid') return 'complete';
+      if (order.value.status === 'failed' || ['unpaid', 'failed', 'cancel'].includes(paymentResult.value)) return 'failed';
+      return 'confirm';
+    });
+
+    const stepCurrent = computed(function () {
+      return view.value === 'complete' ? 5 : 3;
+    });
+
+    const justPaid = computed(function () { return paymentResult.value === 'success'; });
+
+    const subtotal = computed(function () {
+      return order.value.items.reduce(function (sum, item) {
+        return sum + item.product_price * item.quantity;
+      }, 0);
+    });
+    const shipping = computed(function () { return order.value.total_amount - subtotal.value; });
+
+    const createdDate = computed(function () {
+      return new Date(order.value.created_at.replace(' ', 'T') + 'Z').toLocaleDateString('zh-TW');
+    });
+
+    async function checkPayment(fromReturn) {
       if (!order.value || paying.value) return;
       paying.value = true;
       try {
@@ -35,6 +56,8 @@ createApp({
         order.value = res.data;
         if (res.data.status === 'paid') {
           paymentResult.value = 'success';
+        } else if (fromReturn === true) {
+          paymentResult.value = 'unpaid';
         } else {
           Notification.show(res.message || '尚未完成付款，請稍後再查詢', 'info');
         }
@@ -51,7 +74,7 @@ createApp({
         order.value = res.data;
 
         if (paymentResult.value === 'pending' && order.value.status === 'pending') {
-          await checkPayment();
+          await checkPayment(true);
         }
       } catch (e) {
         Notification.show('載入訂單失敗', 'error');
@@ -60,6 +83,9 @@ createApp({
       }
     });
 
-    return { order, loading, paying, paymentResult, statusMap, paymentMessages, checkPayment };
+    return {
+      order, loading, paying, status, view, stepCurrent, justPaid,
+      subtotal, shipping, createdDate, checkPayment
+    };
   }
 }).mount('#app');

@@ -1,0 +1,33 @@
+<%# Vue-bound order items + recipient; expects `order`, `subtotal`, `shipping` in scope. %>
+<section>
+  <h2 class="font-serif text-lg font-semibold text-stem lg:text-xl">商品明細</h2>
+  <div class="mt-1 hidden gap-4 border-b border-line pb-2.5 pt-4 text-[13px] text-ink-3 lg:flex">
+    <span class="flex-1">商品名稱</span><span class="w-[100px] text-right">單價</span><span class="w-[60px] text-right">數量</span><span class="w-[110px] text-right">小計</span>
+  </div>
+  <div v-for="item in order.items" :key="item.id || item.product_name" class="flex items-center justify-between gap-4 border-b border-line py-3.5 lg:py-4">
+    <div class="flex-1">
+      <p class="text-[15px]">{{ item.product_name }}</p>
+      <p class="mt-0.5 text-[13px] text-ink-3 lg:hidden">數量 {{ item.quantity }}</p>
+    </div>
+    <span class="hidden w-[100px] text-right font-num text-[15px] text-ink-2 lg:block">NT$ {{ item.product_price.toLocaleString() }}</span>
+    <span class="hidden w-[60px] text-right font-num text-[15px] text-ink-2 lg:block">{{ item.quantity }}</span>
+    <span class="text-right font-num text-[15px] lg:w-[110px]">NT$ {{ (item.product_price * item.quantity).toLocaleString() }}</span>
+  </div>
+  <template v-if="shipping > 0">
+    <div class="flex justify-between pt-3.5 text-sm text-ink-2 lg:justify-end lg:gap-6"><span>商品小計</span><span class="font-num text-ink lg:w-[110px] lg:text-right">NT$ {{ subtotal.toLocaleString() }}</span></div>
+    <div class="flex justify-between pt-2 text-sm text-ink-2 lg:justify-end lg:gap-6"><span>運費</span><span class="font-num text-ink lg:w-[110px] lg:text-right">NT$ {{ shipping.toLocaleString() }}</span></div>
+  </template>
+  <div class="flex items-center justify-between pt-3.5 lg:justify-end lg:gap-6 lg:pt-4">
+    <span class="text-[15px] font-medium">總計</span>
+    <span class="font-num text-xl lg:text-[22px]">NT$ {{ order.total_amount.toLocaleString() }}</span>
+  </div>
+</section>
+
+<section>
+  <h2 class="font-serif text-lg font-semibold text-stem lg:text-xl">收件資訊</h2>
+  <dl class="mt-2.5 flex flex-col gap-2.5 text-sm lg:mt-3.5 lg:gap-3.5 lg:text-[15px]">
+    <div class="flex gap-3 lg:gap-4"><dt class="w-14 shrink-0 text-ink-3 lg:w-[72px]">收件人</dt><dd>{{ order.recipient_name }}</dd></div>
+    <div class="flex gap-3 lg:gap-4"><dt class="w-14 shrink-0 text-ink-3 lg:w-[72px]">Email</dt><dd class="break-all">{{ order.recipient_email }}</dd></div>
+    <div class="flex gap-3 lg:gap-4"><dt class="w-14 shrink-0 text-ink-3 lg:w-[72px]">地址</dt><dd>{{ order.recipient_address }}</dd></div>
+  </dl>
+</section>
