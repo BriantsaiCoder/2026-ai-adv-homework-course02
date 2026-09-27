@@ -30,16 +30,6 @@ export default defineConfig({
   test: {
     globals: true,          // describe/it/expect 為全域變數，無需 import
     fileParallelism: false, // 停用檔案平行執行（循序執行）
-    sequence: {
-      files: [              // Vitest 2 不讀取此鍵，實際無作用
-        'tests/auth.test.js',
-        'tests/products.test.js',
-        'tests/cart.test.js',
-        'tests/orders.test.js',
-        'tests/adminProducts.test.js',
-        'tests/adminOrders.test.js',
-      ],
-    },
     hookTimeout: 10000,     // beforeAll/afterAll 等 hook 的逾時時間（10 秒）
     env: { DB_PATH: ':memory:' }, // 測試用 in-memory DB，不碰開發用 database.sqlite
   },
@@ -60,7 +50,7 @@ export default defineConfig({
 
 ## 執行順序
 
-Vitest 2 不讀取 `sequence.files`；實際檔案順序由預設 sequencer 依上次執行耗時與檔案大小決定，每次可能不同。各檔 DB 獨立，順序不影響結果。
+Vitest 依預設 include 自動收集 `*.test.js`，檔案順序不固定。各檔有獨立的 `:memory:` DB，順序不影響結果。
 
 **為何要循序執行**：`fileParallelism: false` 使測試檔案逐一執行。由於 `DB_PATH=:memory:` 且 Vitest 預設 forks pool 每個測試檔各跑一個 process，各檔拿到獨立、剛建表並植入種子資料的 DB，檔案之間不共享資料；各檔所需的購物車、訂單等前置資料皆於自身 `beforeAll` 建立。
 
@@ -145,7 +135,7 @@ describe('Your Feature', () => {
 
 ### 2. 無需登錄執行順序
 
-Vitest 依預設 include 自動收集 `*.test.js`，新檔案不需加入 `sequence.files`（Vitest 2 不讀取該鍵）。各檔 DB 獨立，前置資料在同檔 `beforeAll` 建立，勿依賴其他檔案的資料。
+Vitest 依預設 include 自動收集 `*.test.js`，新檔案無需登錄。各檔有獨立的 `:memory:` DB，前置資料在同檔 `beforeAll` 建立，勿依賴其他檔案的資料。
 
 ### 3. 測試模式
 
