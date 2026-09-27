@@ -133,7 +133,7 @@ describe('Your Feature', () => {
 });
 ```
 
-### 2. 無需登錄執行順序
+### 2. 新測試檔無需登錄
 
 Vitest 依預設 include 自動收集 `*.test.js`，新檔案無需登錄。各檔有獨立的 `:memory:` DB，前置資料在同檔 `beforeAll` 建立，勿依賴其他檔案的資料。
 
