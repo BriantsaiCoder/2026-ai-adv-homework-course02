@@ -75,6 +75,9 @@ createApp({
 
         if (paymentResult.value === 'pending' && order.value.status === 'pending') {
           await checkPayment(true);
+        } else if (paymentResult.value === 'unavailable') {
+          // GET /ecpay/payment/:orderId 查詢綠界失敗時不換號、導回此頁
+          Notification.show('暫時無法連線綠界確認付款狀態，請稍後再試。', 'warning');
         }
       } catch (e) {
         Notification.show('載入訂單失敗', 'error');

@@ -24,6 +24,7 @@
 ### Fixed
 - 訪客購物車於登入／註冊後遺失：`POST /api/auth/login`、`POST /api/auth/register` 帶 `X-Session-Id` 時，於 transaction 內將訪客品項併入使用者購物車（同商品數量相加、上限為庫存），結帳頁不再因空購物車被導回 `/cart`
 - 註冊時建立帳號與合併訪客購物車改為同一 transaction：合併失敗不再留下已建立的帳號（先前回 500 後重試會得 409）
+- 重新前往綠界付款被拒（10300028「訂單編號重覆」）：`GET /ecpay/payment/:orderId` 每次付款嘗試改發新的 MerchantTradeNo（order_no 去除連字號 + 至少兩位數的遞增序號）並寫回訂單，`check-payment` 查詢最近一次嘗試；換號前先查詢目前編號，已付款則直接標記 `paid`，避免依序重試時重複扣款；查詢失敗、逾時（`queryTradeInfo` 加 10 秒逾時）或回應缺 TradeStatus 時不換號，導回訂單頁並顯示「暫時無法連線綠界」
 
 ## [1.0.0] - 2026-04-12
 
