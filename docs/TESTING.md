@@ -19,7 +19,7 @@ npx vitest run
 
 ## CI
 
-GitHub Actions（`.github/workflows/ci.yml`）於 PR 與 push 至 main 時，以 Node 24 執行 `npm ci` → `npm run css:build` → `npm test`。CI 以測試用假值注入 `JWT_SECRET`，並於全新 runner 上建立 SQLite 種子資料。
+GitHub Actions（`.github/workflows/ci.yml`）於 PR 與 push 至 main 時，以 Node 24 執行 `npm ci` → `npm run css:build` → `npm test`。CI 以測試用假值注入 `JWT_SECRET`；測試 DB 為 in-memory（見下方 `DB_PATH` 設定），每個測試檔各自建表並植入種子資料。
 
 ## 測試設定
 
@@ -31,7 +31,7 @@ export default defineConfig({
     globals: true,          // describe/it/expect 為全域變數，無需 import
     fileParallelism: false, // 停用檔案平行執行（循序執行）
     sequence: {
-      files: [              // 指定執行順序
+      files: [              // Vitest 2 不讀取此鍵，實際無作用
         'tests/auth.test.js',
         'tests/products.test.js',
         'tests/cart.test.js',
@@ -41,6 +41,7 @@ export default defineConfig({
       ],
     },
     hookTimeout: 10000,     // beforeAll/afterAll 等 hook 的逾時時間（10 秒）
+    env: { DB_PATH: ':memory:' }, // 測試用 in-memory DB，不碰開發用 database.sqlite
   },
 });
 ```
@@ -50,30 +51,18 @@ export default defineConfig({
 | 檔案 | 測試範圍 | 依賴 |
 |------|----------|------|
 | `tests/setup.js` | 輔助函式（非測試檔案） | — |
-| `tests/auth.test.js` | 註冊、登入、重複 email、個人資料 | 無（首先執行，建立種子資料） |
+| `tests/auth.test.js` | 註冊、登入、重複 email、個人資料 | 無（種子資料由 `database.js` 初始化時建立） |
 | `tests/products.test.js` | 商品列表、分頁、詳情、404 | 依賴種子商品存在 |
 | `tests/cart.test.js` | 加入購物車、查看、更新數量、刪除、訪客 vs 登入 | 依賴商品存在 + 使用者認證 |
-| `tests/orders.test.js` | 建立訂單、空購物車、認證要求、訂單列表、詳情、付款 | 依賴購物車有品項 |
+| `tests/orders.test.js` | 建立訂單、空購物車、認證要求、訂單列表、詳情、付款 | `beforeAll` 自建購物車品項 |
 | `tests/adminProducts.test.js` | 後台商品列表、新增、更新、刪除、權限檢查 | 依賴 admin 帳號 |
-| `tests/adminOrders.test.js` | 後台訂單列表、詳情、狀態篩選 | 依賴訂單存在 + admin 帳號 |
+| `tests/adminOrders.test.js` | 後台訂單列表、詳情、狀態篩選 | `beforeAll` 自建訂單 + admin 帳號 |
 
-## 執行順序與依賴關係
+## 執行順序
 
-```
-auth.test.js          ← 第 1 順位：建立使用者，驗證認證機制
-    ↓
-products.test.js      ← 第 2 順位：驗證種子商品（依賴 DB 初始化）
-    ↓
-cart.test.js          ← 第 3 順位：需要商品 + 認證 token
-    ↓
-orders.test.js        ← 第 4 順位：需要購物車有品項
-    ↓
-adminProducts.test.js ← 第 5 順位：需要 admin token
-    ↓
-adminOrders.test.js   ← 第 6 順位：需要訂單存在 + admin token
-```
+Vitest 2 不讀取 `sequence.files`；實際檔案順序由預設 sequencer 依上次執行耗時與檔案大小決定，每次可能不同。各檔 DB 獨立，順序不影響結果。
 
-**為何要循序執行**：測試間存在資料依賴（例如 cart 測試新增的品項會在 orders 測試中用來建立訂單）。`fileParallelism: false` 確保測試檔案依序執行，避免競態條件。
+**為何要循序執行**：`fileParallelism: false` 使測試檔案逐一執行。由於 `DB_PATH=:memory:` 且 Vitest 預設 forks pool 每個測試檔各跑一個 process，各檔拿到獨立、剛建表並植入種子資料的 DB，檔案之間不共享資料；各檔所需的購物車、訂單等前置資料皆於自身 `beforeAll` 建立。
 
 ## 輔助函式說明
 
@@ -154,23 +143,9 @@ describe('Your Feature', () => {
 });
 ```
 
-### 2. 註冊測試執行順序
+### 2. 無需登錄執行順序
 
-在 `vitest.config.js` 的 `sequence.files` 陣列中加入新檔案路徑，確保放在其依賴的測試之後：
-
-```javascript
-sequence: {
-  files: [
-    'tests/auth.test.js',
-    'tests/products.test.js',
-    'tests/cart.test.js',
-    'tests/orders.test.js',
-    'tests/adminProducts.test.js',
-    'tests/adminOrders.test.js',
-    'tests/yourFeature.test.js',  // ← 新增
-  ],
-},
-```
+Vitest 依預設 include 自動收集 `*.test.js`，新檔案不需加入 `sequence.files`（Vitest 2 不讀取該鍵）。各檔 DB 獨立，前置資料在同檔 `beforeAll` 建立，勿依賴其他檔案的資料。
 
 ### 3. 測試模式
 
@@ -220,13 +195,13 @@ it('should work with session ID', async () => {
 
 ## 常見陷阱
 
-### 1. 測試順序依賴
+### 1. 跨檔資料依賴
 
-測試檔案之間有隱式資料依賴。若調整 `sequence.files` 順序，可能導致後續測試因缺少前置資料而失敗。例如 `orders.test.js` 預期購物車中已有品項（由 `cart.test.js` 新增）。
+各測試檔的 DB 彼此獨立，無法依賴其他檔案建立的資料。新測試需要的使用者、購物車、訂單等前置資料，應在同檔的 `beforeAll` 自行建立。
 
-### 2. 共用資料庫狀態
+### 2. 同檔內共用資料庫狀態
 
-所有測試共用同一個 SQLite 資料庫檔案。測試中建立的資料不會自動清除，且可能影響後續測試。設計測試時應考慮：
+同一測試檔內的測試共用同一個 in-memory DB，前面測試寫入的資料（例如扣減的庫存）會影響同檔後續測試。設計測試時應考慮：
 - 使用唯一的 email/名稱，避免衝突
 - `registerUser()` 已自動生成唯一 email（含 timestamp + random）
 
@@ -240,13 +215,13 @@ it('should work with session ID', async () => {
 
 `hookTimeout: 10000`（10 秒）。若 `beforeAll` 中需要多次 HTTP 請求（如註冊 + 登入 + 加入購物車），應注意是否超時。
 
-### 5. 無 afterAll 清理
+### 5. 資料清理非必要
 
-目前測試未實作資料清理。每次完整測試運行會累積測試資料在 `database.sqlite` 中。這通常不影響測試結果（因為使用唯一識別碼），但長期可能使測試資料庫膨脹。
+除 `orders.test.js` 運費測試的 `afterAll` 外，測試未實作資料清理，也不需要：in-memory DB 隨測試 process 結束而消失，每次執行都從種子資料重新開始，不會累積到開發用的 `database.sqlite`（先前共用該檔時，重複執行會耗盡種子商品庫存而連鎖失敗）。
 
 ### 6. supertest 直接使用 app
 
 測試透過 `request(app)` 直接對 Express 實例發送請求，不會啟動實際 HTTP 伺服器。這意味著：
 - 不需要管理埠號衝突
 - 不會觸發 `server.js` 中的 `app.listen()`
-- `database.js` 在 `require('../app')` 時即初始化（建表 + 種子資料）
+- `database.js` 在 `require('../app')` 時即初始化（建表 + 種子資料）；路徑取自 `DB_PATH` 環境變數，未設定時為專案根目錄的 `database.sqlite`

@@ -6,7 +6,7 @@
 ├── app.js                          # Express 應用設定：view engine、靜態檔案、middleware 串接、路由掛載、404/錯誤處理
 ├── server.js                       # 伺服器啟動入口，監聽 PORT（預設 3001）
 ├── package.json                    # 專案設定與 npm scripts
-├── vitest.config.js                # Vitest 測試設定（循序執行、檔案順序）
+├── vitest.config.js                # Vitest 測試設定（循序執行、測試 DB_PATH=:memory:）
 ├── swagger-config.js               # Swagger/OpenAPI 設定（OpenAPI 3.0.3）
 ├── generate-openapi.js             # 從 JSDoc 註解生成 openapi.json
 ├── database.sqlite                 # SQLite 資料庫檔案（自動建立）
@@ -287,7 +287,7 @@ server.js
 ## 資料庫 Schema
 
 引擎：SQLite3（better-sqlite3，同步 API）  
-檔案：`database.sqlite`（專案根目錄，自動建立）  
+檔案：`database.sqlite`（專案根目錄，自動建立；可用 `DB_PATH` 環境變數覆寫，測試固定為 `:memory:`）  
 模式：WAL（Write-Ahead Logging），啟用 foreign keys
 
 ### users
