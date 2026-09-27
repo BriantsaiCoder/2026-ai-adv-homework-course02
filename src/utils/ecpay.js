@@ -169,6 +169,10 @@ async function queryTradeInfo(merchantTradeNo, config) {
 
   const responseText = await response.text();
   const result = Object.fromEntries(new URLSearchParams(responseText));
+  // 回應未通過簽章驗證（含缺少 CheckMacValue）即不可信任 TradeStatus
+  if (!verifyCheckMacValue(result, cfg.hashKey, cfg.hashIV)) {
+    throw new Error('ECPay QueryTradeInfo CheckMacValue 驗證失敗');
+  }
   return result;
 }
 

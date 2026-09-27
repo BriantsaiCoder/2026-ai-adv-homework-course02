@@ -1,14 +1,19 @@
 const { app, request, registerUser } = require('./setup');
 const db = require('../src/database');
+const { generateCheckMacValue, ECPAY_CONFIG } = require('../src/utils/ecpay');
 
 function formTradeNo(html) {
   return html.match(/name="MerchantTradeNo" value="([^"]+)"/)[1];
 }
 
-function stubQueryTradeInfo(tradeStatus) {
+// 回應依綠界規則簽章；給 signedStatus 時以該狀態簽章後再竄改 TradeStatus，模擬偽造回應
+function stubQueryTradeInfo(tradeStatus, signedStatus = tradeStatus) {
+  const fields = { MerchantID: ECPAY_CONFIG.merchantId, TradeStatus: signedStatus };
+  fields.CheckMacValue = generateCheckMacValue(fields, ECPAY_CONFIG.hashKey, ECPAY_CONFIG.hashIV);
+  fields.TradeStatus = tradeStatus;
   const fetchMock = vi.fn(async () => ({
     ok: true,
-    text: async () => `TradeStatus=${tradeStatus}`,
+    text: async () => new URLSearchParams(fields).toString(),
   }));
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
@@ -73,5 +78,40 @@ describe('ECPay payment attempts', () => {
     expect(retry.status).toBe(302);
     expect(retry.headers.location).toBe('/orders/' + orderId);
     expect(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status).toBe('paid');
+  });
+
+  it('check-payment rejects a response whose CheckMacValue does not match', async () => {
+    const { token, orderId } = await createOrder();
+
+    stubQueryTradeInfo('1', '0');
+    const forged = await request(app)
+      .post(`/api/orders/${orderId}/check-payment`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(forged.status).toBe(500);
+    expect(forged.body.error).toBe('ECPAY_QUERY_ERROR');
+    expect(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status).toBe('pending');
+
+    stubQueryTradeInfo('1');
+    const genuine = await request(app)
+      .post(`/api/orders/${orderId}/check-payment`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(genuine.status).toBe(200);
+    expect(genuine.body.data.status).toBe('paid');
+  });
+
+  it('payment retry does not trust a forged paid status', async () => {
+    const { orderId } = await createOrder();
+    stubQueryTradeInfo('0');
+    const first = await request(app).get('/ecpay/payment/' + orderId);
+
+    stubQueryTradeInfo('1', '0');
+    const retry = await request(app).get('/ecpay/payment/' + orderId);
+
+    expect(retry.status).toBe(302);
+    expect(retry.headers.location).toBe(`/orders/${orderId}?payment=pending`);
+    expect(db.prepare('SELECT status, merchant_trade_no FROM orders WHERE id = ?').get(orderId))
+      .toEqual({ status: 'pending', merchant_trade_no: formTradeNo(first.text) });
   });
 });

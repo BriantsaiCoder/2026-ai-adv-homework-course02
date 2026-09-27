@@ -17,6 +17,7 @@
 
 ### Fixed
 - 重新前往綠界付款被拒（10300028「訂單編號重覆」）：`GET /ecpay/payment/:orderId` 每次付款嘗試改發新的 MerchantTradeNo（order_no 去除連字號 + 兩位數遞增序號）並寫回訂單，`check-payment` 查詢最近一次嘗試；換號前先查詢前次編號，已付款則直接標記 `paid`，避免重複扣款
+- QueryTradeInfo 回應未驗證簽章即採信 TradeStatus：`queryTradeInfo` 改為驗證回應 CheckMacValue，不符或缺少即 throw，`check-payment` 與付款換號流程皆不再依未驗證的回應標記 `paid`
 
 ## [1.0.0] - 2026-04-12
 
