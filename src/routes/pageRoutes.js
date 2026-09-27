@@ -94,8 +94,6 @@ router.get('/ecpay/payment/:orderId', async function (req, res, next) {
 
     const items = db.prepare('SELECT product_name, product_price, quantity FROM order_items WHERE order_id = ?').all(order.id);
     const html = buildAioFormHtml({ ...order, merchant_trade_no: tradeNo }, items);
-    // 瀏覽器從綠界按上一頁時重新 GET 換號，而非重播快取中的自動送出表單
-    res.set('Cache-Control', 'no-store');
     res.type('text/html').send(html);
   } catch (err) {
     next(err);
