@@ -12,6 +12,7 @@ createApp({
     const order = ref(null);
     const loading = ref(true);
     const paying = ref(false);
+    const redirecting = ref(false);
 
     const statusMap = {
       pending: { label: '待付款', cls: 'bg-apricot-bg text-apricot-ink' },
@@ -68,6 +69,38 @@ createApp({
       }
     }
 
+    // 付款嘗試需登入且限訂單擁有者：由 API 換號並回傳 AIO 表單參數，再於此建立表單送出至綠界
+    async function startPayment() {
+      if (!order.value || redirecting.value) return;
+      redirecting.value = true;
+      try {
+        const res = await apiFetch('/api/orders/' + order.value.id + '/payment-attempt', { method: 'POST' });
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = res.data.action;
+        Object.entries(res.data.fields).forEach(function ([name, value]) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = name;
+          input.value = value;
+          form.appendChild(input);
+        });
+        document.body.appendChild(form);
+        form.submit(); // 維持 redirecting，導向綠界前不再重複送出
+      } catch (e) {
+        Notification.show(e?.data?.message || '無法前往付款，請稍後再試', 'warning');
+        redirecting.value = false;
+        // 已付款或狀態已變更時重新載入訂單，讓畫面切換到對應狀態
+        const res = await apiFetch('/api/orders/' + order.value.id).catch(function () { return null; });
+        if (res) order.value = res.data;
+      }
+    }
+
+    // 從綠界按上一頁時頁面可能由 bfcache 還原，redirecting 仍為 true，需重設才能再次付款
+    window.addEventListener('pageshow', function (event) {
+      if (event.persisted) redirecting.value = false;
+    });
+
     onMounted(async function () {
       try {
         const res = await apiFetch('/api/orders/' + orderId);
@@ -84,8 +117,8 @@ createApp({
     });
 
     return {
-      order, loading, paying, status, view, stepCurrent, justPaid,
-      subtotal, shipping, createdDate, checkPayment
+      order, loading, paying, redirecting, status, view, stepCurrent, justPaid,
+      subtotal, shipping, createdDate, checkPayment, startPayment
     };
   }
 }).mount('#app');

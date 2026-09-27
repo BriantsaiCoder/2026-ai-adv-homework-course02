@@ -7,7 +7,7 @@
 ### Added
 - 綠界 ECPay AIO 金流串接：結帳後導向綠界付款頁面完成真實付款流程
 - 新增 `src/utils/ecpay.js` 工具模組：CheckMacValue 簽章產生/驗證、ECPay 專用 URL 編碼、QueryTradeInfo API 查詢
-- 新增 `GET /ecpay/payment/:orderId` 頁面路由：產生自動送出的 ECPay 付款表單
+- 新增 `POST /api/orders/:id/payment-attempt` API（需登入且限訂單擁有者）：建立付款嘗試並回傳 ECPay AIO 表單參數，由訂單詳情頁建立表單送出至綠界
 - 新增 `POST /api/orders/:id/check-payment` API：透過 QueryTradeInfo API 主動查詢付款狀態（取代本地端無法接收的 Server Notify）
 - 訂單新增 `merchant_trade_no` 欄位：對應綠界 MerchantTradeNo，由 order_no 去除連字號產生
 - 前台設計稿（`docs/design/`，desktop 1440／mobile 390）與依稿切版之八頁前台：首頁（本季主打、四欄商品格）、商品頁（麵包屑、你可能也喜歡）、購物車（免運進度）、結帳（步驟條、付款方式）、訂單確認／付款完成／付款未完成、登入、我的訂單、404
@@ -24,6 +24,8 @@
 ### Fixed
 - 訪客購物車於登入／註冊後遺失：`POST /api/auth/login`、`POST /api/auth/register` 帶 `X-Session-Id` 時，於 transaction 內將訪客品項併入使用者購物車（同商品數量相加、上限為庫存），結帳頁不再因空購物車被導回 `/cart`
 - 註冊時建立帳號與合併訪客購物車改為同一 transaction：合併失敗不再留下已建立的帳號（先前回 500 後重試會得 409）
+- 重新前往綠界付款被拒（10300028「訂單編號重覆」）：付款嘗試（`POST /api/orders/:id/payment-attempt`）每次改發新的 MerchantTradeNo（order_no 去除連字號 + 至少兩位數的遞增序號）並寫回訂單，`check-payment` 查詢最近一次嘗試；換號前先查詢目前編號，已付款則直接標記 `paid`，避免依序重試時重複扣款；僅在未付款（`0`）、交易失敗（`10200095`）或從未送出（`10200047`）時換號，查詢失敗、逾時（`queryTradeInfo` 加 10 秒逾時）、驗簽失敗、回應缺 TradeStatus 或其他代碼時不換號，回 503 並於訂單頁顯示「暫時無法連線綠界」；換號以條件式更新寫入，併發請求不會取得同一編號
+- QueryTradeInfo 回應未驗證簽章即採信 TradeStatus：`queryTradeInfo` 改為驗證回應 CheckMacValue（不符或缺少即 throw），並要求回應的 MerchantTradeNo 等於查詢編號，`check-payment` 與付款換號流程皆不再依未驗證的回應標記 `paid`；回應改按原文解析（綠界回應值未經 URL 編碼，`URLSearchParams` 會把商品名稱中的 `+`、`%XX` 解錯而誤判驗簽失敗）
 
 ## [1.0.0] - 2026-04-12
 
