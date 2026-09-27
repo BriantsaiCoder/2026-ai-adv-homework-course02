@@ -118,9 +118,12 @@ describe('ECPay payment attempts', () => {
     // 兩個請求都讀到同一個目前編號後才放行查詢，重現併發換號
     let release;
     const bothQueried = new Promise((resolve) => { release = resolve; });
+    const gateTimeout = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('第二個請求未到達 QueryTradeInfo')), 1000);
+    });
     fetchMock.mockImplementation(async (...args) => {
       if (fetchMock.mock.calls.length === 2) release();
-      await bothQueried;
+      await Promise.race([bothQueried, gateTimeout]);
       return reply(...args);
     });
 
@@ -132,6 +135,35 @@ describe('ECPay payment attempts', () => {
     expect(responses.map((r) => r.status).sort()).toEqual([200, 302]);
     const form = responses.find((r) => r.status === 200);
     expect(db.prepare('SELECT merchant_trade_no FROM orders WHERE id = ?').get(orderId).merchant_trade_no).toBe(formTradeNo(form.text));
+  });
+
+  it('does not render a form when the order becomes paid while QueryTradeInfo is in flight', async () => {
+    const { orderId } = await createOrder();
+    const before = db.prepare('SELECT merchant_trade_no FROM orders WHERE id = ?').get(orderId).merchant_trade_no;
+    const fetchMock = stubQueryTradeInfo('0');
+    const reply = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation(async (...args) => {
+      // 例如另一個分頁的 check-payment 在查詢期間標記已付款
+      db.prepare('UPDATE orders SET status = ? WHERE id = ?').run('paid', orderId);
+      return reply(...args);
+    });
+
+    const res = await request(app).get('/ecpay/payment/' + orderId);
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/orders/' + orderId);
+    expect(db.prepare('SELECT merchant_trade_no FROM orders WHERE id = ?').get(orderId).merchant_trade_no).toBe(before);
+  });
+
+  it('rejects the attempt once the next trade no would exceed 20 characters', async () => {
+    const { orderId } = await createOrder();
+    const { order_no } = db.prepare('SELECT order_no FROM orders WHERE id = ?').get(orderId);
+    db.prepare('UPDATE orders SET merchant_trade_no = ? WHERE id = ?').run(order_no.replace(/-/g, '') + '9999', orderId);
+    stubQueryTradeInfo('0');
+
+    const res = await request(app).get('/ecpay/payment/' + orderId);
+
+    expect(res.status).toBe(400);
   });
 
   it('check-payment rejects tampered or other-trade responses and accepts a genuine one', async () => {
