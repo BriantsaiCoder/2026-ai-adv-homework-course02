@@ -1,6 +1,4 @@
 const express = require('express');
-const db = require('../database');
-const { buildAioFormHtml, queryTradeInfo } = require('../utils/ecpay');
 const router = express.Router();
 
 // Helper to render with front layout
@@ -55,54 +53,6 @@ router.get('/orders/:id', function (req, res) {
     orderId: req.params.id,
     paymentResult: req.query.payment || ''
   });
-});
-
-// ECPay payment form page
-// 綠界拒收重複的 MerchantTradeNo（10300028），每次付款嘗試改用 order_no 去連字號 + 遞增序號
-router.get('/ecpay/payment/:orderId', async function (req, res, next) {
-  try {
-    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.orderId);
-    if (!order) {
-      return res.status(404).send('訂單不存在');
-    }
-    if (order.status !== 'pending') {
-      return res.redirect('/orders/' + order.id);
-    }
-
-    const baseTradeNo = order.order_no.replace(/-/g, '');
-    const prevTradeNo = order.merchant_trade_no || baseTradeNo;
-
-    // 換號前確認目前編號未付款，避免依序重試時對已付款訂單重複扣款（從未送出的編號回 10200047，照常換號）
-    const result = await queryTradeInfo(prevTradeNo).catch((err) => {
-      console.error('[ECPay] QueryTradeInfo error:', err.message);
-      return null;
-    });
-    if (result && result.TradeStatus === '1') {
-      db.prepare('UPDATE orders SET status = ? WHERE id = ?').run('paid', order.id);
-      return res.redirect('/orders/' + order.id);
-    }
-    // 只有確認未付款（0）、交易失敗（10200095）或從未送出（10200047）才換號；查詢失敗、缺 TradeStatus 或其他代碼一律不換號
-    if (!result || !['0', '10200047', '10200095'].includes(result.TradeStatus)) {
-      return res.redirect('/orders/' + order.id + '?payment=unavailable');
-    }
-
-    const tradeNo = baseTradeNo + String(Number(prevTradeNo.slice(baseTradeNo.length)) + 1).padStart(2, '0');
-    if (tradeNo.length > 20) {
-      return res.status(400).send('付款嘗試次數已達上限');
-    }
-    // 查詢期間可能有併發請求已換號或訂單已付款：僅在編號與狀態未變時換號，否則導回訂單頁
-    const claimed = db.prepare('UPDATE orders SET merchant_trade_no = ? WHERE id = ? AND status = ? AND merchant_trade_no IS ?')
-      .run(tradeNo, order.id, 'pending', order.merchant_trade_no).changes;
-    if (!claimed) {
-      return res.redirect('/orders/' + order.id);
-    }
-
-    const items = db.prepare('SELECT product_name, product_price, quantity FROM order_items WHERE order_id = ?').all(order.id);
-    const html = buildAioFormHtml({ ...order, merchant_trade_no: tradeNo }, items);
-    res.type('text/html').send(html);
-  } catch (err) {
-    next(err);
-  }
 });
 
 // Admin pages

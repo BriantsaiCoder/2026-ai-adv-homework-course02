@@ -158,6 +158,7 @@ server.js
 | GET | `/api/orders` | JWT | 自己的訂單列表 | orderRoutes.js |
 | GET | `/api/orders/:id` | JWT | 訂單詳情 | orderRoutes.js |
 | PATCH | `/api/orders/:id/pay` | JWT | 模擬付款（開發除錯用） | orderRoutes.js |
+| POST | `/api/orders/:id/payment-attempt` | JWT | 建立綠界付款嘗試（換號）並回傳 AIO 表單參數 | orderRoutes.js |
 | POST | `/api/orders/:id/check-payment` | JWT | 查詢綠界付款狀態 | orderRoutes.js |
 
 ### 後台商品（/api/admin/products）
@@ -187,7 +188,6 @@ server.js
 | `/login` | 登入 | pages/login.js |
 | `/orders` | 我的訂單 | pages/orders.js |
 | `/orders/:id` | 訂單詳情 | pages/order-detail.js |
-| `/ecpay/payment/:orderId` | 綠界付款表單（自動送出） | —（直接回傳 HTML） |
 | `/admin/products` | 後台商品管理 | pages/admin-products.js |
 | `/admin/orders` | 後台訂單管理 | pages/admin-orders.js |
 
@@ -385,13 +385,13 @@ server.js
   │
   ├─ 前端導向 /orders/:orderId（訂單確認頁），使用者點「前往綠界付款」
   │
-  ├─ GET /ecpay/payment/:orderId
-  │    └─ QueryTradeInfo 確認目前編號未付款（已付款則標記 paid 並導回訂單頁；僅 TradeStatus 0／10200095／10200047 換號；查詢、逾時、驗證失敗、缺 TradeStatus 或其他代碼 → 導回 ?payment=unavailable，不換號）
+  ├─ POST /api/orders/:id/payment-attempt（JWT，限訂單擁有者）
+  │    └─ QueryTradeInfo 確認目前編號未付款（已付款則標記 paid → 409；僅 TradeStatus 0／10200095／10200047 換號；查詢、逾時、驗證失敗、缺 TradeStatus 或其他代碼 → 503，不換號）
   │    └─ 產生本次嘗試的 MerchantTradeNo（order_no 去連字號 + 遞增序號）
-  │    └─ 條件式更新寫回訂單（編號與 pending 狀態未變才寫入；併發落敗或查詢期間已付款 → 導回訂單頁）
+  │    └─ 條件式更新寫回訂單（編號與 pending 狀態未變才寫入；併發落敗或查詢期間已付款 → 409）
   │    └─ Server 產生 ECPay AIO 參數（MerchantTradeNo, TotalAmount, ItemName 等）
   │    └─ 計算 CheckMacValue（SHA256，ECPay 專用 URL 編碼）
-  │    └─ 回傳自動送出 HTML 表單 → 瀏覽器 POST 至綠界
+  │    └─ 回傳 { action, fields } → 前端建立表單 POST 至綠界
   │
   ├─ 使用者在綠界付款頁面完成付款
   │

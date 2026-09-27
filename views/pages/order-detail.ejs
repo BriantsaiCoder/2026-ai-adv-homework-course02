@@ -61,7 +61,7 @@
         <p class="font-num text-[34px] text-stem lg:text-[44px]">NT$ {{ order.total_amount.toLocaleString() }}</p>
         <p class="hidden items-center gap-2.5 text-sm text-ink-2 lg:flex"><span class="text-sage-ink"><%- include('../partials/icon', { name: 'shield-check', cls: 'w-[18px] h-[18px]' }) %></span>綠界 ECPay 線上付款</p>
         <template v-if="order.status === 'pending'">
-          <a :href="'/ecpay/payment/' + order.id" class="btn-primary lg:h-[54px]">{{ view === 'failed' ? '重新前往綠界付款' : '前往綠界付款' }}</a>
+          <button @click="startPayment" :disabled="redirecting" class="btn-primary lg:h-[54px]">{{ redirecting ? '前往綠界中…' : view === 'failed' ? '重新前往綠界付款' : '前往綠界付款' }}</button>
           <button @click="checkPayment" :disabled="paying" class="btn-secondary lg:h-[52px]">{{ paying ? '查詢中…' : '我已付款，查詢付款狀態' }}</button>
           <p class="text-xs leading-[1.7] text-ink-3 lg:text-[13px]">付款完成後會自動回到本站並更新狀態。<span class="hidden lg:inline">若狀態未更新，請點「查詢付款狀態」。</span></p>
         </template>

@@ -99,7 +99,8 @@ function buildItemName(items) {
   return name;
 }
 
-function buildAioFormHtml(order, items, config) {
+// 回傳 AIO 表單的 action 與欄位，由前端建立表單送出至綠界
+function buildAioFormParams(order, items, config) {
   const baseUrl = process.env.BASE_URL || 'http://localhost:3001';
   const cfg = config || ECPAY_CONFIG;
 
@@ -119,29 +120,7 @@ function buildAioFormHtml(order, items, config) {
 
   params.CheckMacValue = generateCheckMacValue(params, cfg.hashKey, cfg.hashIV);
 
-  const fields = Object.entries(params)
-    .map(([k, v]) => `<input type="hidden" name="${k}" value="${escapeHtml(String(v))}">`)
-    .join('\n    ');
-
-  return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>正在前往綠界付款...</title></head>
-<body>
-  <p style="text-align:center;margin-top:50px;font-family:sans-serif;">正在導向綠界付款頁面，請稍候...</p>
-  <form id="ecpay-form" method="post" action="${cfg.aioCheckOutUrl}">
-    ${fields}
-  </form>
-  <script>document.getElementById("ecpay-form").submit();</script>
-</body>
-</html>`;
-}
-
-function escapeHtml(str) {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  return { action: cfg.aioCheckOutUrl, fields: params };
 }
 
 async function queryTradeInfo(merchantTradeNo, config) {
@@ -178,8 +157,8 @@ async function queryTradeInfo(merchantTradeNo, config) {
   if (!verifyCheckMacValue(result, cfg.hashKey, cfg.hashIV)) {
     throw new Error('ECPay QueryTradeInfo CheckMacValue 驗證失敗');
   }
-  // 簽章只證明出自綠界；已付款結果須對應本次查詢的編號，防止挪用他筆交易的真實回應
-  if (result.TradeStatus === '1' && result.MerchantTradeNo !== merchantTradeNo) {
+  // 簽章只證明出自綠界；結果須對應本次查詢的編號，防止挪用他筆交易的真實回應（已付款或未付款皆會影響換號與扣款判斷）
+  if (result.MerchantTradeNo !== merchantTradeNo) {
     throw new Error('ECPay QueryTradeInfo MerchantTradeNo 不符');
   }
   return result;
@@ -191,6 +170,6 @@ module.exports = {
   generateCheckMacValue,
   verifyCheckMacValue,
   getMerchantTradeDate,
-  buildAioFormHtml,
+  buildAioFormParams,
   queryTradeInfo,
 };
